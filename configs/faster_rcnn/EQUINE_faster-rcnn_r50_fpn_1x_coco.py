@@ -6,19 +6,19 @@ _base_ = [
     '../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py'
 ]
 
-_base_.visualizer.vis_backends = [
-    dict(type='LocalVisBackend'),  # Keep if you want local logging as well
-    dict(type='WandbVisBackend'),  # Add this line
-]
-
 # Dataset type and path adjustments
 dataset_type = 'CocoDataset'
 data_root = '/content/drive/MyDrive/EqNeck/'
 
 # Since your images are black and white, you might consider converting them to 3 channels
 # but without normalization. Adjust `img_norm_cfg` if you decide to normalize.
+# img_norm_cfg = dict(
+#     mean=[0, 0, 0], std=[1, 1, 1], to_rgb=True)
 img_norm_cfg = dict(
-    mean=[0, 0, 0], std=[1, 1, 1], to_rgb=True)
+    mean=[0.44612417047467656 * 255, 0.44612417047467656 * 255, 0.44612417047467656 * 255],  # Convert mean to [0, 255] range
+    std=[0.2963657997790614 * 255, 0.2963657997790614 * 255, 0.2963657997790614 * 255],      # Convert std to [0, 255] range
+    to_rgb=True
+)
 
 train_pipeline = [
     dict(type='LoadImageFromFile', to_float32=True),
@@ -61,6 +61,43 @@ data = dict(
         img_prefix=data_root + 'EqNeckImages',
         pipeline=test_pipeline)
 )
+########################################################################### changing coco_detection.py
+# Assuming the 'dataset_type', 'data_root', 'train_pipeline', and 'test_pipeline' are defined as above
+train_dataloader = dict(
+    batch_size=4,  # Adjust based on trial and error to optimize GPU usage
+    num_workers=4,  # Increase to speed up data loading, adjust based on system's CPU
+    persistent_workers=True,
+    sampler=dict(type='DefaultSampler', shuffle=True),
+    dataset=dict(
+        type=dataset_type,
+        data_root=data_root,
+        ann_file=data_root + 'annotations/train_Data_coco.json',
+        #img_prefix=data_root + 'EqNeckImages',
+        pipeline=train_pipeline))
+
+val_dataloader = dict(
+    batch_size=4,  # Can be higher if validation does not involve backpropagation
+    num_workers=4,
+    persistent_workers=True,
+    drop_last=False,
+    sampler=dict(type='DefaultSampler', shuffle=False),
+    dataset=dict(
+        type=dataset_type,
+        data_root=data_root,
+        ann_file=data_root + 'annotations/val_Data_coco.json',
+        #img_prefix=data_root + 'EqNeckImages',
+        pipeline=test_pipeline))  # Ensure 'test_pipeline' is defined similarly to your 'train_pipeline'
+
+test_dataloader = val_dataloader.copy()  # Often, test dataloader config is the same as for validation
+
+val_evaluator = dict(
+    type='CocoMetric',
+    ann_file=data_root + 'annotations/val_Data_coco.json',
+    metric='bbox',
+    format_only=False)
+
+test_evaluator = val_evaluator.copy()  # Similarly, test evaluator config often mirrors validation
+######################################################################
 
 # Adjust the number of classes for your dataset
 model = dict(
@@ -84,7 +121,7 @@ total_epochs = 12  # Adjust based on your needs
 
 
 # Choose appropriate work directory
-work_dir = '/content/drive/mmdetection'
+work_dir = '/content/mmdetection'
 
 # Adjust log level and interval
 log_config = dict(interval=50)
