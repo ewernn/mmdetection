@@ -6,6 +6,11 @@ _base_ = [
     '../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py'
 ]
 
+_base_.visualizer.vis_backends = [
+    dict(type='LocalVisBackend'),  # Keep if you want local logging as well
+    dict(type='WandbVisBackend'),  # Add this line
+]
+
 # Dataset type and path adjustments
 dataset_type = 'CocoDataset'
 data_root = '/content/drive/MyDrive/EqNeck/'
@@ -66,7 +71,7 @@ model = dict(
 
 # Adjust the learning rate policy
 optimizer = dict(type='SGD', lr=0.003, momentum=0.9, weight_decay=0.0001)
-# This example assumes 8 GPUs. Adjust the learning rate based on your actual setup.
+
 optimizer_config = dict(grad_clip=None)
 # Adjust the number of epochs, learning rate schedule, etc., according to your dataset size and desired training length.
 lr_config = dict(
