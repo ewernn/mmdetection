@@ -2,12 +2,12 @@
 
 _base_ = [
     '../_base_/models/faster-rcnn_r50_fpn.py',
-    '../_base_/datasets/coco_detection.py',
+    '../_base_/datasets/coco_format_detection.py',
     '../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py'
 ]
 
 # Dataset type and path adjustments
-dataset_type = 'CocoDataset'
+dataset_type = 'coco_formatDataset'
 # data_root = '/content/drive/MyDrive/EqNeck/'  # Google Colab
 data_root = '/home/ewern/mmdetection/EqNeckData/'
 
@@ -47,22 +47,22 @@ test_pipeline = [
 data = dict(
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'train_Data_coco.json',
+        ann_file=data_root + 'train_Data_coco_format.json',
         img_prefix=data_root,
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'val_Data_coco.json',
+        ann_file=data_root + 'val_Data_coco_format.json',
         img_prefix=data_root,
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'test_Data_coco.json',
-        #ann_file='/content/drive/MyDrive/EqNeck/EqNeckImages/test_Data_coco.json',
+        ann_file=data_root + 'test_Data_coco_format.json',
+        #ann_file='/content/drive/MyDrive/EqNeck/EqNeckImages/test_Data_coco_format.json',
         img_prefix=data_root,
         pipeline=test_pipeline)
 )
-########################################################################### changing coco_detection.py
+########################################################################### changing coco_format_detection.py
 # Assuming the 'dataset_type', 'data_root', 'train_pipeline', and 'test_pipeline' are defined as above
 train_dataloader = dict(
     batch_size=4,  # Adjust based on trial and error to optimize GPU usage
@@ -72,7 +72,7 @@ train_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'train_Data_coco.json',
+        ann_file=data_root + 'train_Data_coco_format.json',
         #img_prefix=data_root + 'EqNeckImages',
         pipeline=train_pipeline))
 
@@ -85,15 +85,15 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'val_Data_coco.json',
+        ann_file=data_root + 'val_Data_coco_format.json',
         #img_prefix=data_root + 'EqNeckImages',
         pipeline=test_pipeline))  # Ensure 'test_pipeline' is defined similarly to your 'train_pipeline'
 
 test_dataloader = val_dataloader.copy()  # Often, test dataloader config is the same as for validation
 
 val_evaluator = dict(
-    type='CocoMetric',
-    ann_file=data_root + 'val_Data_coco.json',
+    type='coco_formatMetric',
+    ann_file=data_root + 'val_Data_coco_format.json',
     metric='bbox',
     format_only=False)
 
@@ -122,7 +122,7 @@ total_epochs = 12  # Adjust based on your needs
 
 
 # Choose appropriate work directory
-work_dir = '/content/mmdetection'
+work_dir = '/home/ewern/mmdetection'
 
 # Adjust log level and interval
 log_config = dict(interval=50)
