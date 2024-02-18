@@ -8,7 +8,8 @@ _base_ = [
 
 # Dataset type and path adjustments
 dataset_type = 'CocoDataset'
-data_root = '/content/drive/MyDrive/EqNeck/'
+# data_root = '/content/drive/MyDrive/EqNeck/'  # Google Colab
+data_root = '/home/ewern/mmdetection/EqNeckData/'
 
 # Since your images are black and white, you might consider converting them to 3 channels
 # but without normalization. Adjust `img_norm_cfg` if you decide to normalize.
@@ -46,19 +47,19 @@ test_pipeline = [
 data = dict(
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'EqNeckImages/train_Data_coco.json',
-        img_prefix=data_root + 'EqNeckImages',
+        ann_file=data_root + 'train_Data_coco.json',
+        img_prefix=data_root,
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'EqNeckImages/val_Data_coco.json',
-        img_prefix=data_root + 'EqNeckImages',
+        ann_file=data_root + 'val_Data_coco.json',
+        img_prefix=data_root,
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'EqNeckImages/test_Data_coco.json',
+        ann_file=data_root + 'test_Data_coco.json',
         #ann_file='/content/drive/MyDrive/EqNeck/EqNeckImages/test_Data_coco.json',
-        img_prefix=data_root + 'EqNeckImages',
+        img_prefix=data_root,
         pipeline=test_pipeline)
 )
 ########################################################################### changing coco_detection.py
@@ -71,7 +72,7 @@ train_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'EqNeckImages/train_Data_coco.json',
+        ann_file=data_root + 'train_Data_coco.json',
         #img_prefix=data_root + 'EqNeckImages',
         pipeline=train_pipeline))
 
@@ -84,7 +85,7 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'EqNeckImages/val_Data_coco.json',
+        ann_file=data_root + 'val_Data_coco.json',
         #img_prefix=data_root + 'EqNeckImages',
         pipeline=test_pipeline))  # Ensure 'test_pipeline' is defined similarly to your 'train_pipeline'
 
@@ -92,7 +93,7 @@ test_dataloader = val_dataloader.copy()  # Often, test dataloader config is the 
 
 val_evaluator = dict(
     type='CocoMetric',
-    ann_file=data_root + 'EqNeckImages/val_Data_coco.json',
+    ann_file=data_root + 'val_Data_coco.json',
     metric='bbox',
     format_only=False)
 
