@@ -1,4 +1,4 @@
-
+# hi eric
 
 image_dir = '/Users/ewern/Desktop/code/MetronMind/stacked_hour\
 glass_point_localization/data/EqNeck/EqNeckData'

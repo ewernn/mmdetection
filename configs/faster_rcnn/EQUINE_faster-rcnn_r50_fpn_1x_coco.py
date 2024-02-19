@@ -28,11 +28,11 @@ train_pipeline = [
     dict(type='PhotoMetricDistortion', brightness_delta=32, contrast_range=(0.8, 1.2), saturation_range=(0.8, 1.2)),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
-    dict(type='LoadAnnotations', with_bbox=True),
 ]
 
 test_pipeline = [
     dict(type='LoadImageFromFile'),
+    dict(type='LoadAnnotations', with_bbox=True),
     dict(type='MultiScaleFlipAug',
          flip=False,
          transforms=[
@@ -72,9 +72,10 @@ train_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'train_Data_coco_format.json',
+        #ann_file=data_root + 'train_Data_coco_format.json',
         #img_prefix=data_root + 'EqNeckImages',
-        pipeline=train_pipeline))
+        #pipeline=train_pipeline))
+    ))
 
 val_dataloader = dict(
     batch_size=4,  # Can be higher if validation does not involve backpropagation
@@ -85,14 +86,15 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'val_Data_coco_format.json',
+        #ann_file=data_root + 'val_Data_coco_format.json',
         #img_prefix=data_root + 'EqNeckImages',
-        pipeline=test_pipeline))  # Ensure 'test_pipeline' is defined similarly to your 'train_pipeline'
+        #pipeline=test_pipeline))  # Ensure 'test_pipeline' is defined similarly to your 'train_pipeline'
+    ))
 
 test_dataloader = val_dataloader.copy()  # Often, test dataloader config is the same as for validation
 
 val_evaluator = dict(
-    type='coco_formatMetric',
+    type='CocoMetric',
     ann_file=data_root + 'val_Data_coco_format.json',
     metric='bbox',
     format_only=False)
