@@ -9,7 +9,7 @@ _base_ = [
 # Dataset type and path adjustments
 dataset_type = 'CocoDataset'
 # data_root = '/content/drive/MyDrive/EqNeck/'  # Google Colab
-data_root = '/home/ewern/mmdetection/EqNeckData/'
+data_root = '/home/eawern/mmdetection/EqNeckData/'
 
 # Since your images are black and white, you might consider converting them to 3 channels
 # but without normalization. Adjust `img_norm_cfg` if you decide to normalize.
@@ -122,7 +122,7 @@ total_epochs = 12  # Adjust based on your needs
 
 
 # Choose appropriate work directory
-work_dir = '/home/ewern/mmdetection'
+work_dir = '/home/eawern/mmdetection'
 
 # Adjust log level and interval
 log_config = dict(interval=50)
