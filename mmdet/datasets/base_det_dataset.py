@@ -74,15 +74,26 @@ class BaseDetDataset(BaseDataset):
             return
         # load data information
         self.data_list = self.load_data_list()
+        # print(f"palabra: \n\n{self.data_list[0]}")
+        # print(f"ERIC: {type(self.data_list)}")
+        # print(f"ERIC: {len(self.data_list)}")
         # get proposals from file
         if self.proposal_file is not None:
             self.load_proposals()
+        # print(f"ERIC: {type(self.data_list)}")
+        # print(f"ERIC: {len(self.data_list)}")
+        # print(f"palabra: \n\n{self.data_list[0]}")
         # filter illegal data, such as data that has no annotations.
         self.data_list = self.filter_data()
 
+        # print(f"ERIC (after filter_data): {type(self.data_list)}")
+        # print(f"ERIC: {len(self.data_list)}")
         # Get subset data according to indices.
         if self._indices is not None:
             self.data_list = self._get_unserialized_subset(self._indices)
+
+        # print(f"ERIC: {type(self.data_list)}")
+        # print(f"ERIC: {len(self.data_list)}")
 
         # serialize data_list
         if self.serialize_data:
