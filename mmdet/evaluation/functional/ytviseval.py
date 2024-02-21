@@ -144,7 +144,7 @@ class YTVISeval:
         :return: None
         '''
         tic = time.time()
-        print('Running per image evaluation...')
+        print('Running per image evaluation in ytviseval.py...')
         p = self.params
         # add backward compatibility if useSegm is specified in params
         if p.useSegm is not None:
@@ -376,7 +376,7 @@ class YTVISeval:
         :param p: input params for evaluation
         :return: None
         """
-        print('Accumulating evaluation results...')
+        print('Accumulating evaluation results...from ytviseval.py')
         tic = time.time()
         if not self.evalImgs:
             print('Please run evaluate() first')

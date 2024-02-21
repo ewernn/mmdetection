@@ -14,6 +14,7 @@ from mmdet.evaluation import DumpDetResults
 from mmdet.registry import RUNNERS
 from mmdet.utils import setup_cache_size_limit_of_dynamo
 
+#import wandb
 
 # TODO: support fuse_conv_bn and format_only
 def parse_args():
@@ -146,4 +147,6 @@ def main():
 
 
 if __name__ == '__main__':
+    #wandb.init(project='MM_EquineNeck_0', entity='ewernn')
     main()
+    #wandb.finish()

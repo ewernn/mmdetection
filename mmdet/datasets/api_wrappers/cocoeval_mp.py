@@ -74,7 +74,7 @@ class COCOevalMP(COCOeval):
         :return: None
         """
         tic = time.time()
-        print('Running per image evaluation...')
+        print('Running per image evaluation... in cocoeval_mp.py')
         p = self.params
         # add backward compatibility if useSegm is specified in params
         if p.useSegm is not None:
@@ -107,6 +107,11 @@ class COCOevalMP(COCOeval):
             self.evalImgs = pool.starmap(self._evaluateImg, mp_params)
 
         self.evalImgs = list(itertools.chain(*self.evalImgs))
+
+        print(f"ERIC: len(self.evalImgs): {len(self.evalImgs)}")
+        print(f"ERIC: len(self._evaluateImg): {len(self._evaluateImg)}")
+        print(mp_params, '\n ---DONE---')
+
 
         self._paramsEval = copy.deepcopy(self.params)
         toc = time.time()

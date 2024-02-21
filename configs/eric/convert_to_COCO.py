@@ -14,7 +14,7 @@ def split_data(df, test_size=0.2):
 def create_coco_format_subset(df, images_dir, output_json_path, subset_name):
     images = []
     annotations = []
-    categories = [{'id': 1, 'name': 'vertebra'}]
+    categories = [{'id': 1, 'name': 'vertebrae'}] # ERIC ADDED
     
     annotation_id = 1  # Start annotation IDs at 1
     for idx, row in df.iterrows():
@@ -44,7 +44,7 @@ def create_coco_format_subset(df, images_dir, output_json_path, subset_name):
                 annotations.append({
                     'id': annotation_id,
                     'image_id': idx + 1,
-                    'category_id': 1,
+                    'category_id': 1,  # ERIC CHANGED
                     'bbox': bbox,
                     'area': (x_max - x_min) * (y_max - y_min),
                     'iscrowd': 0,

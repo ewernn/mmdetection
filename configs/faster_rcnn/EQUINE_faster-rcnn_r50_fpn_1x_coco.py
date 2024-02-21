@@ -62,6 +62,11 @@ data = dict(
         img_prefix=data_root,
         pipeline=test_pipeline)
 )
+
+checkpoint=dict(type='CheckpointHook', interval=1)  # ERIC added
+
+visualization=dict(type='DetVisualizationHook', out_file='/home/eawern/mmdetection/EqNeckData')  # ERIC added; saves images
+
 ########################################################################### changing coco_format_detection.py
 # Assuming the 'dataset_type', 'data_root', 'train_pipeline', and 'test_pipeline' are defined as above
 train_dataloader = dict(
@@ -120,7 +125,7 @@ lr_config = dict(
     warmup_iters=500,
     warmup_ratio=0.001,
     step=[8, 11])
-total_epochs = 12  # Adjust based on your needs
+total_epochs = 120  # Adjust based on your needs
 
 
 # Choose appropriate work directory
