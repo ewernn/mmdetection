@@ -1,5 +1,6 @@
 auto_scale_lr = dict(base_batch_size=16, enable=False)
 backend_args = None
+checkpoint = dict(interval=1, type='CheckpointHook')
 checkpoint_config = dict(interval=1)
 data = dict(
     test=dict(
@@ -119,7 +120,8 @@ default_hooks = dict(
     param_scheduler=dict(type='ParamSchedulerHook'),
     sampler_seed=dict(type='DistSamplerSeedHook'),
     timer=dict(type='IterTimerHook'),
-    visualization=dict(type='DetVisualizationHook'))
+    visualization=dict(
+        draw=True, test_out_dir='exps/exp1/pics', type='DetVisualizationHook'))
 default_scope = 'mmdet'
 env_cfg = dict(
     cudnn_benchmark=False,
@@ -138,7 +140,7 @@ img_norm_cfg = dict(
     ],
     to_rgb=True)
 launcher = 'none'
-load_from = None
+load_from = 'exps/exp1/epoch_83.pth'
 log_config = dict(interval=50)
 log_level = 'INFO'
 log_processor = dict(by_epoch=True, type='LogProcessor', window_size=50)
@@ -329,8 +331,13 @@ param_scheduler = [
         end=12,
         gamma=0.1,
         milestones=[
-            8,
-            11,
+            10,
+            30,
+            50,
+            70,
+            90,
+            110,
+            119,
         ],
         type='MultiStepLR'),
 ]
@@ -399,8 +406,8 @@ test_pipeline = [
         ],
         type='MultiScaleFlipAug'),
 ]
-total_epochs = 12
-train_cfg = dict(max_epochs=12, type='EpochBasedTrainLoop', val_interval=1)
+total_epochs = 120
+train_cfg = dict(max_epochs=120, type='EpochBasedTrainLoop', val_interval=1)
 train_dataloader = dict(
     batch_sampler=dict(type='AspectRatioBatchSampler'),
     batch_size=4,
@@ -498,6 +505,9 @@ val_evaluator = dict(
 vis_backends = [
     dict(type='LocalVisBackend'),
 ]
+visualization = dict(
+    out_file='/home/eawern/mmdetection/EqNeckData',
+    type='DetVisualizationHook')
 visualizer = dict(
     name='visualizer',
     type='DetLocalVisualizer',

@@ -18,6 +18,7 @@ from mmdet.registry import METRICS
 from mmdet.structures.mask import encode_mask_results
 from ..functional import eval_recalls
 
+#import wandb
 
 @METRICS.register_module()
 class CocoMetric(BaseMetric):
@@ -435,6 +436,7 @@ class CocoMetric(BaseMetric):
 
         for metric in self.metrics:
             logger.info(f'Evaluating {metric}...')
+            #wandb.log(metric)
 
             # TODO: May refactor fast_eval_recall to an independent metric?
             # fast eval recall
@@ -599,4 +601,5 @@ class CocoMetric(BaseMetric):
 
         if tmp_dir is not None:
             tmp_dir.cleanup()
+
         return eval_results
