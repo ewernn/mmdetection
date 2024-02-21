@@ -1,5 +1,5 @@
 # training schedule for 1x
-train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=12, val_interval=1)
+train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=120, val_interval=1)
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
 
@@ -12,7 +12,8 @@ param_scheduler = [
         begin=0,
         end=12,
         by_epoch=True,
-        milestones=[8, 11],
+        #milestones=[8, 11],
+        milestones=[10, 30,50,70,90,110,119],
         gamma=0.1)
 ]
 
