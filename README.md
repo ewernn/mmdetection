@@ -1,5 +1,5 @@
 eric links:
-[mmdetection get started guide](https://mmdetection.readthedocs.io/en/latest/get_started.html)
+1. [mmdetection get started guide](https://mmdetection.readthedocs.io/en/latest/get_started.html)
 
 ## original readme below
 ---
