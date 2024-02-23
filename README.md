@@ -1,3 +1,8 @@
+eric links:
+1. [mmdetection get started guide](https://mmdetection.readthedocs.io/en/latest/get_started.html)
+
+## original readme below
+---
 <div align="center">
   <img src="resources/mmdet-logo.png" width="600"/>
   <div>&nbsp;</div>
