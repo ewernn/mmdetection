@@ -20,6 +20,7 @@ Please follow the [guide](https://mmdetection.readthedocs.io/en/latest/get_start
 ```{note}
 If you install mmdeploy prebuilt package, please also clone its repository by 'git clone https://github.com/open-mmlab/mmdeploy.git --depth=1' to get the deployment config files.
 ```
+python mmdeploy/tools/deploy.py mmdeploy/configs/mmdet/detection/detection_tensorrt_dynamic-320x320-1344x1344.py mmdetection/configs/faster_rcnn/EQUINE_faster-rcnn_r50_fpn_1x_coco.py mmdetection/exps/exp1/epoch_83.pth mmdetection/EqNeckData/Im0.tif --work-dir mmdeploy_model/faster-rcnn --device cuda --dump-info
 
 ## Convert model
 

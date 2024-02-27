@@ -34,7 +34,6 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='MultiScaleFlipAug',
-         flip=False,
          transforms=[
              # Removed Resize operation
              dict(type='Normalize', **img_norm_cfg),
