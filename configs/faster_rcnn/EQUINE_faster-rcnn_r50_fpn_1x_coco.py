@@ -1,3 +1,15 @@
+
+_base_ = [
+    '../_base_/models/faster-rcnn_r50_fpn.py',
+    '../_base_/datasets/coco_detection.py',
+    '../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py'
+]
+
+# Dataset type and path adjustments
+dataset_type = 'CocoDataset'
+# data_root = '/content/drive/MyDrive/EqNeck/'  # Google Colab
+data_root = '/home/eawern/mmdetection/EqNeckData/'
+
 # Simplified Configuration for ONNX Export
 model = dict(
     type='FasterRCNN',
