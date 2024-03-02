@@ -131,16 +131,15 @@ def imrescale(
         return rescaled_img
 
 
-
 @TRANSFORMS.register_module()
 class Collect(BaseTransform): 
-"""Collect and only reserve the specified fields.    
-    **Required Keys:**
-    - ``*keys``
-    **Deleted Keys:**
-    All keys except those in the argument ``*keys``.
-    Args: 
-        keys (Sequence[str]): The keys of the fields to be collected. 
+    """Collect and only reserve the specified fields.    
+        **Required Keys:**
+        - ``*keys``
+        **Deleted Keys:**
+        All keys except those in the argument ``*keys``.
+        Args: 
+            keys (Sequence[str]): The keys of the fields to be collected. 
     """
     def __init__(self, keys): 
         self.keys = keys
@@ -151,7 +150,7 @@ class Collect(BaseTransform):
         return data
 
     def  __repr__ (self):
-        return  self.__class__.__name__ + f'(keys={self.keys})'
+        return self.__class__.__name__ + f'(keys={self.keys})'
 
 @TRANSFORMS.register_module()
 class Resize(MMCV_Resize):
