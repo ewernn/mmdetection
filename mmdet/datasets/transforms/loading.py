@@ -16,6 +16,8 @@ from mmdet.structures.bbox import get_box_type
 from mmdet.structures.bbox.box_type import autocast_box_type
 from mmdet.structures.mask import BitmapMasks, PolygonMasks
 
+from mmengine import fileio
+
 @TRANSFORMS.register_module()
 class LoadImageFromFile(BaseTransform):
     """Load an image from file.
