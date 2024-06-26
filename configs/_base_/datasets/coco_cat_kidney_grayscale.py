@@ -19,14 +19,16 @@ data_version = 'COCO_2/'
 #     }))
 backend_args = None
 
+img_norm_cfg = dict(mean=[123.675], std=[58.395], to_rgb=False)  # Adjusted for grayscale
 train_pipeline = [
     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='RandomAffine', max_rotate_degree=20, scaling_ratio_range=(0.8, 1.2)),
-    #dict(type='RandomRotate',degree=20,prob=0.5,pad_val=0),#seg_pad_val=255),
+    dict(type='RandomResize', scale=(1000, 1000), ratio_range=(0.8, 1.2), keep_ratio=True),
     dict(type='RandomAffine', max_rotate_degree=20, scaling_ratio_range=(0.8, 1.2,),),
     dict(type='RandomFlip', prob=0.5),
-    dict(type='Resize', scale=(1000, 1000), keep_ratio=True),
+    dict(type='RandomBrightnessContrast', brightness_limit=0.2, contrast_limit=0.2, prob=0.5),
+#    dict(type='Normalize', **img_norm_cfg),
+    dict(type='Pad', size_divisor=32),
     dict(type='PackDetInputs')
 ]
 test_pipeline = [
@@ -96,3 +98,4 @@ test_evaluator =  dict(
     metric='bbox',
     format_only=False,
     backend_args=backend_args)
+
