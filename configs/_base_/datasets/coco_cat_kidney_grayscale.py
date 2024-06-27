@@ -23,16 +23,13 @@ img_norm_cfg = dict(mean=[123.675], std=[58.395], to_rgb=False)  # Adjusted for 
 train_pipeline = [
     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='RandomResize', scale=(1000, 1000), ratio_range=(0.8, 1.2), keep_ratio=True),
-    dict(type='RandomAffine', max_rotate_degree=20, scaling_ratio_range=(0.8, 1.2,),),
-    dict(type='RandomFlip', prob=0.5),
-    dict(type='PhotoMetricDistortion',
-         brightness_delta=32,
-         contrast_range=(0.8, 1.2),
-         saturation_range=(0.8, 1.2),
-         hue_delta=0),  # Set hue_delta to 0 for grayscale images
-    dict(type='Normalize', **img_norm_cfg),
-    dict(type='Pad', size_divisor=32),
+    #dict(type='Resize', scale=(1000, 1000), keep_ratio=True),
+    #dict(type='RandomFlip', prob=0.5),
+    dict(type='RandomAffine', max_rotate_degree=20, scaling_ratio_range=(0.8, 1.2)),
+    #dict(type='Contrast', level=5),  # Adjust contrast
+    dict(type='Brightness', level=5),  # Adjust brightness
+    #dict(type='Normalize', **img_norm_cfg),
+    #dict(type='Pad', size_divisor=32),
     dict(type='PackDetInputs')
 ]
 test_pipeline = [

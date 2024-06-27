@@ -6,10 +6,10 @@ _base_ = [
 
 
 model = dict(
-    data_preprocessor=dict(
+    data_preprocessor = dict(
         type='DetDataPreprocessor',
-        mean=[123.675],
-        std=[58.395],
+        mean=None,  # [134.069] No normalization
+        std=None,   # [98.622] No normalization
         bgr_to_rgb=False,
         pad_size_divisor=32
     ),
@@ -25,13 +25,13 @@ model = dict(
         init_cfg=None,#dict(type='Pretrained', checkpoint='/Users/ewern/Desktop/code/MetronMind/mmdetection/configs/eric/resnet50_grayscale_cleaned.pth'),
         in_channels=1,
         # Added: Attention mechanism to enhance feature extraction
-        plugins=[
-            dict(
-                cfg=dict(type='GeneralizedAttention', spatial_range=-1, num_heads=8, attention_type='0010', kv_stride=2),
-                stages=(False, False, True, True),
-                position='after_conv2'
-            )
-        ]
+        # plugins=[
+        #     dict(
+        #         cfg=dict(type='GeneralizedAttention', spatial_range=-1, num_heads=8, attention_type='0010', kv_stride=2),
+        #         stages=(False, False, True, True),
+        #         position='after_conv2'
+        #     )
+        # ]
     ),
     neck=dict(
         type='FPN',
