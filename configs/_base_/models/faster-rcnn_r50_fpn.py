@@ -65,8 +65,8 @@ model = dict(
             assigner=dict(
                 type='MaxIoUAssigner',
                 pos_iou_thr=0.7,
-                neg_iou_thr=0.3,
-                min_pos_iou=0.3,
+                neg_iou_thr=0.2,
+                min_pos_iou=0.2,
                 match_low_quality=True,
                 ignore_iof_thr=-1),
             sampler=dict(
@@ -80,15 +80,15 @@ model = dict(
             debug=False),
         rpn_proposal=dict(
             nms_pre=2000,
-            max_per_img=1000,
-            nms=dict(type='nms', iou_threshold=0.7),
+            max_per_img=200,  # Reduced from 1000
+            nms=dict(type='nms', iou_threshold=0.3),  # Lowered from 0.7
             min_bbox_size=0),
         rcnn=dict(
             assigner=dict(
                 type='MaxIoUAssigner',
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.5,
-                min_pos_iou=0.5,
+                pos_iou_thr=0.6,
+                neg_iou_thr=0.2,
+                min_pos_iou=0.2,
                 match_low_quality=False,
                 ignore_iof_thr=-1),
             sampler=dict(
@@ -102,13 +102,13 @@ model = dict(
     test_cfg=dict(
         rpn=dict(
             nms_pre=1000,
-            max_per_img=1000,
-            nms=dict(type='nms', iou_threshold=0.7),
+            max_per_img=200,  # Reduced from 1000
+            nms=dict(type='nms', iou_threshold=0.5),  # Lowered from 0.7
             min_bbox_size=0),
         rcnn=dict(
-            score_thr=0.05,
-            nms=dict(type='nms', iou_threshold=0.5),
-            max_per_img=100)
+            score_thr=0.1, # increased from 0.05
+            nms=dict(type='nms', iou_threshold=0.3),
+            max_per_img=2)
         # soft-nms is also supported for rcnn testing
         # e.g., nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.05)
     ))
