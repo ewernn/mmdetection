@@ -37,7 +37,8 @@ model = dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
-        num_outs=5,
+        num_outs=3,
+        start_level=1, # skip smallest scale (4,8,16,32)
         # Added: Extra convolutions on input features
         add_extra_convs='on_input',
     ),
@@ -45,9 +46,9 @@ model = dict(
         anchor_generator=dict(
             type='AnchorGenerator',
             # Modified: Adjusted scales for smaller objects
-            scales=[4, 8, 16],
-            ratios=[0.5, 1.0, 2.0],
-            strides=[4, 8, 16, 32, 64]
+            ratios=[1.2, 1.3],
+            strides = [8, 16, 32],
+            scales = [12, 16, 20],
         ),
     ),
     roi_head=dict(

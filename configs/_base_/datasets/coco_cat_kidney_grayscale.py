@@ -1,7 +1,8 @@
 # dataset settings
 dataset_type = 'CocoDataset'
 #data_root = 'data/coco/'
-data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
+#data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
+data_root = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/'
 data_version = 'COCO_2/'
 
 # Example to use different file client
@@ -28,9 +29,11 @@ train_pipeline = [
     dict(type='RandomAffine', max_rotate_degree=20, scaling_ratio_range=(0.8, 1.2)),
     #dict(type='Contrast', level=5),  # Adjust contrast
     dict(type='Brightness', level=5),  # Adjust brightness
-    #dict(type='Normalize', **img_norm_cfg),
+    dict(type='Normalize', **img_norm_cfg),
     #dict(type='Pad', size_divisor=32),
-    dict(type='PackDetInputs')
+    dict(type='PackDetInputs',
+         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
+                    'scale_factor', 'flip', 'flip_direction', 'batch_ids'))
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
