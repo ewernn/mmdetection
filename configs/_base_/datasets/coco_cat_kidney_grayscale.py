@@ -35,14 +35,14 @@ img_norm_cfg = dict(mean=[123.675], std=[58.395], to_rgb=False)
 train_pipeline = [
     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='RandomResize', scale=[(800, 800), (1000, 1000), (1200, 1200)], keep_ratio=True),
+    #dict(type='RandomResize', scale=[(800, 800), (1000, 1000), (1200, 1200)], keep_ratio=True),
     dict(type='RandomCrop', crop_size=(800, 800), allow_negative_crop=False),
-    dict(type='RandomFlip', flip_ratio=0.5),
+    dict(type='RandomFlip', prob=0.5),
     dict(type='RandomAffine', scaling_ratio_range=(0.8, 1.2), max_rotate_degree=20, max_translate_ratio=0.1, border_val=0),
     dict(type='RandomOrder', transforms=[
         dict(type='Brightness', level=5),
-        dict(type='Contrast', level=5),
-        dict(type='Equalize', prob=0.2),
+        #dict(type='Contrast', level=5),
+        #dict(type='Equalize', prob=0.2),
         dict(type='Sharpness', level=5),
     ]),
     dict(type='Normalize', **img_norm_cfg),
