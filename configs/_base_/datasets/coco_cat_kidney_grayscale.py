@@ -1,8 +1,8 @@
 # dataset settings
 dataset_type = 'CocoDataset'
 #data_root = 'data/coco/'
-#data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
-data_root = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/'
+data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
+#data_root = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/'
 data_version = 'COCO_2/'
 
 # Example to use different file client
