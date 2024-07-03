@@ -6,7 +6,7 @@ test_cfg = dict(type='TestLoop')
 # optimizer
 optim_wrapper = dict(
     type='OptimWrapper',
-    optimizer=dict(type='SGD', lr=0.002, momentum=0.9, weight_decay=0.0001))
+    optimizer=dict(type='SGD', lr=1e-4, momentum=0.9, weight_decay=0.0001))
 
 # learning rate
 param_scheduler = [
