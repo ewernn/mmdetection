@@ -50,10 +50,14 @@ model = dict(
             strides = [8, 16, 32],
             scales = [12, 16, 20],
         ),
+        loss_bbox=dict(loss_weight=1.0, type='L1Loss'),
+        loss_cls=dict(loss_weight=0.5, type='FocalLoss', use_sigmoid=True, gamma=2.0, alpha=0.25),
     ),
     roi_head=dict(
         bbox_head=dict(
             # Modified: Set to 1 for kidney detection (assuming single class)
+            loss_bbox=dict(loss_weight=1.0, type='GIoULoss'),
+            loss_cls=dict(loss_weight=0.5, type='FocalLoss', use_sigmoid=True, gamma=2.0, alpha=0.25),
             num_classes=1
         )
     )
