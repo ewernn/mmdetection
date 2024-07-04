@@ -10,7 +10,6 @@ from mmdet.models.utils import mask2ndarray
 from mmdet.registry import DATASETS, VISUALIZERS
 from mmdet.structures.bbox import BaseBoxes
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description='Browse a dataset')
     parser.add_argument('config', help='train config file path')
@@ -39,6 +38,8 @@ def parse_args():
     return args
 
 
+import cv2  # Add this import
+
 def main():
     args = parse_args()
     cfg = Config.fromfile(args.config)
@@ -63,7 +64,13 @@ def main():
             args.output_dir,
             osp.basename(img_path)) if args.output_dir is not None else None
 
-        img = img[..., [2, 1, 0]]  # bgr to rgb
+        # Check if the image is grayscale
+        if img.shape[-1] == 1:
+            img = img.squeeze(-1)  # Remove the last dimension if it's 1 (grayscale)
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)  # Convert grayscale to BGR for consistent visualization
+        else:
+            img = img[..., [2, 1, 0]]  # bgr to rgb for color images
+
         gt_bboxes = gt_instances.get('bboxes', None)
         if gt_bboxes is not None and isinstance(gt_bboxes, BaseBoxes):
             gt_instances.bboxes = gt_bboxes.tensor

@@ -18,15 +18,14 @@ param_scheduler = [
         begin=0,
         end=1000
     ),
-    # Cyclical learning rate
+    # Cosine annealing phase
     dict(
-        type='CyclicLR',
-        by_epoch=False,
-        target_ratio=(1, 0.1),
-        cyclic_times=5,
-        step_ratio_up=0.4,
-        begin=1000,
-        end=120000  # Adjust based on your total iterations
+        type='CosineAnnealingLR',
+        T_max=119,  # Total number of epochs - 1
+        eta_min=1e-5,  # Minimum learning rate
+        begin=0,
+        end=120,
+        by_epoch=True
     )
 ]
 
