@@ -10,13 +10,10 @@ from tqdm import tqdm
 import wandb
 import tools.utils as utils # Import your custom utils
 import sys
+import math  # Add this import
 
 # Initialize wandb
-# wandb.init(project="cat_kidney_detection", config={
-#     "learning_rate": 1e-3,
-#     "epochs": 120,
-#     "batch_size": 2
-# })
+wandb.init(project="cat_kidney_detection")
 
 class CocoDataset(Dataset):
     def __init__(self, root, annFile, transforms=None):
@@ -116,7 +113,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
         # Log metrics to wandb
-        #wandb.log({"loss": loss_value, "lr": optimizer.param_groups[0]["lr"]})
+        wandb.log({"loss": loss_value, "lr": optimizer.param_groups[0]["lr"]})
 
     return metric_logger
 
@@ -130,7 +127,7 @@ def main():
     num_classes = 2  # 1 class (cat) + background
     num_epochs = 120
     batch_size = 2
-    learning_rate = 1e-3
+    learning_rate = wandb.config.learning_rate  # Use wandb config for learning rate
     weight_decay = 0.0001
     momentum = 0.9
 

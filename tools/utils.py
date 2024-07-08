@@ -152,4 +152,23 @@ def warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor):
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
+def reduce_dict(input_dict, average=True):
+    """Reduce the values in the dictionary from all processes so that all processes have the averaged results.
+    Returns a dict with the same fields as input_dict, after reduction."""
+    world_size = torch.distributed.get_world_size() if torch.distributed.is_initialized() else 1
+    if world_size < 2:
+        return input_dict
+    with torch.no_grad():
+        names = []
+        values = []
+        for k in sorted(input_dict.keys()):
+            names.append(k)
+            values.append(input_dict[k])
+        values = torch.stack(values, dim=0)
+        torch.distributed.all_reduce(values)
+        if average:
+            values /= world_size
+        reduced_dict = {k: v for k, v in zip(names, values)}
+    return reduced_dict
+
 # Add other utility functions as needed
