@@ -1,0 +1,5 @@
+program: tools/train_cat_kidney.py
+method: grid
+parameters:
+  learning_rate:
+    values: [1e-4, 1e-3, 1e-2]
