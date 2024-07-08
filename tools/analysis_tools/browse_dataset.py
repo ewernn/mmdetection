@@ -39,6 +39,12 @@ def parse_args():
 
 
 import cv2  # Add this import
+import numpy as np
+
+def denormalize(img, mean, std):
+    """Denormalize image."""
+    img = img * std + mean
+    return img
 
 def main():
     args = parse_args()
@@ -53,6 +59,11 @@ def main():
     visualizer = VISUALIZERS.build(cfg.visualizer)
     visualizer.dataset_meta = dataset.metainfo
 
+    # Get normalization parameters from the config
+    img_norm_cfg = cfg.train_pipeline[-2]  # Assuming Normalize is the second last step
+    mean = np.array(img_norm_cfg['mean'], dtype=np.float32)
+    std = np.array(img_norm_cfg['std'], dtype=np.float32)
+
     progress_bar = ProgressBar(len(dataset))
     for item in dataset:
         img = item['inputs'].permute(1, 2, 0).numpy()
@@ -64,12 +75,21 @@ def main():
             args.output_dir,
             osp.basename(img_path)) if args.output_dir is not None else None
 
+        # Denormalize the image for visualization
+        img_vis = denormalize(img, mean, std)
+
         # Check if the image is grayscale
-        if img.shape[-1] == 1:
-            img = img.squeeze(-1)  # Remove the last dimension if it's 1 (grayscale)
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)  # Convert grayscale to BGR for consistent visualization
+        if img_vis.shape[-1] == 1:
+            img_vis = img_vis.squeeze(-1)  # Remove the last dimension if it's 1 (grayscale)
+            img_vis = cv2.cvtColor(img_vis, cv2.COLOR_GRAY2BGR)  # Convert grayscale to BGR for consistent visualization
         else:
-            img = img[..., [2, 1, 0]]  # bgr to rgb for color images
+            img_vis = img_vis[..., [2, 1, 0]]  # bgr to rgb for color images
+
+        # Clip the image values to [0, 255] and convert to uint8
+        img_vis = np.clip(img_vis, 0, 255).astype(np.uint8)
+
+        # Debug print to check image values
+        print(f"Image min: {np.min(img_vis)}, max: {np.max(img_vis)}, mean: {np.mean(img_vis)}")
 
         gt_bboxes = gt_instances.get('bboxes', None)
         if gt_bboxes is not None and isinstance(gt_bboxes, BaseBoxes):
@@ -82,7 +102,7 @@ def main():
 
         visualizer.add_datasample(
             osp.basename(img_path),
-            img,
+            img_vis,
             data_sample,
             draw_pred=False,
             show=not args.not_show,
