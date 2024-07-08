@@ -44,56 +44,21 @@ if result:
     print(f"Mean pixel value: {mean:.3f}")
     print(f"Standard deviation: {std:.3f}")
 
+    # Update the training pipeline with the calculated mean and std
+    train_pipeline = [
+        dict(backend_args=None, color_type='grayscale', type='LoadImageFromFile'),
+        dict(type='LoadAnnotations', with_bbox=True),
+        dict(keep_ratio=True, scale=(1000, 1000), type='Resize'),
+        dict(prob=0.5, type='RandomFlip'),
+        dict(max_rotate_degree=20, scaling_ratio_range=(0.8, 1.2), type='RandomAffine'),
+        dict(level=5, type='Brightness'),
+        dict(mean=[mean], std=[std], to_rgb=False, type='Normalize'),
+        dict(size_divisor=32, type='Pad'),
+        dict(type='PackDetInputs'),
+    ]
 
-
-# correct brightness
-train_pipeline = [
-    dict(backend_args=None, color_type='grayscale', type='LoadImageFromFile'),
-    dict(type='LoadAnnotations', with_bbox=True),
-    dict(keep_ratio=True, scale=(
-        1000,
-        1000,
-    ), type='Resize'),
-    dict(prob=0.5, type='RandomFlip'),
-    dict(
-        max_rotate_degree=20,
-        scaling_ratio_range=(
-            0.8,
-            1.2,
-        ),
-        type='RandomAffine'),
-    dict(level=5, type='Brightness'),
-    dict(mean=[
-        123.675,
-    ], std=[
-        58.395,
-    ], to_rgb=False, type='Normalize'),
-    dict(size_divisor=32, type='Pad'),
-    dict(type='PackDetInputs'),
-]
-
-# wrong
-train_pipeline = [
-    dict(backend_args=None, color_type='grayscale', type='LoadImageFromFile'),
-    dict(type='LoadAnnotations', with_bbox=True),
-    dict(keep_ratio=True, scale=(
-        1000,
-        1000,
-    ), type='Resize'),
-    dict(prob=0.5, type='RandomFlip'),
-    dict(
-        max_rotate_degree=20,
-        scaling_ratio_range=(
-            0.8,
-            1.2,
-        ),
-        type='RandomAffine'),
-    dict(level=5, type='Brightness'),
-    dict(mean=[
-        123.675,
-    ], std=[
-        58.395,
-    ], to_rgb=False, type='Normalize'),
-    dict(size_divisor=32, type='Pad'),
-    dict(type='PackDetInputs'),
-]
+    print("Updated training pipeline:")
+    for step in train_pipeline:
+        print(step)
+else:
+    print("Failed to calculate mean and standard deviation.")
