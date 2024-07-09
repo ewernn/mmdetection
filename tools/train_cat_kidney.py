@@ -50,6 +50,7 @@ class CocoDataset(Dataset):
         target = {}
         target["boxes"] = boxes
         target["labels"] = labels
+        target["image_id"] = torch.tensor([img_id])  # Add image_id to target
 
         if self.transforms is not None:
             img = self.transforms(img)
