@@ -6,6 +6,7 @@ import torchvision.transforms as T
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 from tqdm import tqdm
 import wandb
 import tools.utils as utils # Import your custom utils
@@ -71,6 +72,32 @@ def get_transform(train):
 def collate_fn(batch):
     return tuple(zip(*batch))
 
+def evaluate(model, data_loader, device):
+    model.eval()
+    coco = data_loader.dataset.coco
+    coco_results = []
+    for images, targets in data_loader:
+        images = list(img.to(device) for img in images)
+        outputs = model(images)
+        for target, output in zip(targets, outputs):
+            image_id = target["image_id"].item()
+            boxes = output["boxes"].cpu().numpy()
+            scores = output["scores"].cpu().numpy()
+            labels = output["labels"].cpu().numpy()
+            for box, score, label in zip(boxes, scores, labels):
+                coco_results.append({
+                    "image_id": image_id,
+                    "category_id": label,
+                    "bbox": box.tolist(),
+                    "score": score,
+                })
+    coco_dt = coco.loadRes(coco_results)
+    coco_eval = COCOeval(coco, coco_dt, "bbox")
+    coco_eval.evaluate()
+    coco_eval.accumulate()
+    coco_eval.summarize()
+    return coco_eval.stats[0]  # mAP
+
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -115,6 +142,10 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
         # Log metrics to wandb
         wandb.log({"loss": loss_value, "lr": optimizer.param_groups[0]["lr"]})
 
+    # Evaluate and log mAP
+    mAP = evaluate(model, data_loader, device)
+    wandb.log({"mAP": mAP})
+
     return metric_logger
 
 def main():
@@ -125,7 +156,7 @@ def main():
 
     # Hyperparameters
     num_classes = 2  # 1 class (cat) + background
-    num_epochs = 120
+    num_epochs = 5
     batch_size = 2
     learning_rate = wandb.config.learning_rate  # Use wandb config for learning rate
     weight_decay = 0.0001
