@@ -45,7 +45,10 @@ def create_coco_format(data_csv_path, images_dir, output_json_path):
 def create_coco_format_subset(df, images_dir, output_json_path, subset_name):
     images = []
     annotations = []
-    categories = [{'id': 1, 'name': 'vertebrae'}]
+    categories = [
+        {'id': 1, 'name': 'left_kidney'},
+        {'id': 2, 'name': 'right_kidney'}
+    ]
     
     annotation_id = 1
     abs_counter = 0  # Initialize the counter
@@ -87,10 +90,14 @@ def create_coco_format_subset(df, images_dir, output_json_path, subset_name):
                 bbox_width = bbox_height = 10
             
             bbox = [min(x, x2), min(y, y2), bbox_width, bbox_height]
+            
+            # Determine the category_id based on the index
+            category_id = 1 if i == 0 else 2  # 1 for left_kidney, 2 for right_kidney
+            
             annotations.append({
                 'id': annotation_id,
                 'image_id': idx + 1,
-                'category_id': 1,
+                'category_id': category_id,
                 'bbox': bbox,
                 'area': bbox_width * bbox_height,
                 'iscrowd': 0,
@@ -113,6 +120,6 @@ def create_coco_format_subset(df, images_dir, output_json_path, subset_name):
 # Usage
 data_csv_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Data.csv'  # Update with your actual path
 images_dir = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset'               # Update with your actual path to images directory
-output_json_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-json'  # Update with your desired output path
+output_json_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-json-2-class'  # Update with your desired output path
 
 create_coco_format(data_csv_path, images_dir, output_json_path)
