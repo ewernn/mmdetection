@@ -16,7 +16,7 @@ class CocoDataset(BaseDetDataset):
 
     METAINFO = {
         'classes':
-        ('vertebrae'),
+        ('left_kidney', 'right_kidney'),
         # ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train',
         #  'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign',
         #  'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep',
@@ -32,7 +32,7 @@ class CocoDataset(BaseDetDataset):
         #  'scissors', 'teddy bear', 'hair drier', 'toothbrush'),
         # palette is a list of color tuples, which is used for visualization.
         'palette':
-        [(220, 20, 60)]
+        [(220, 20, 60), (255, 255, 255)]
     }
     COCOAPI = COCO
     # ann_id is unique in coco dataset.
@@ -47,29 +47,26 @@ class CocoDataset(BaseDetDataset):
         with get_local_path(
                 self.ann_file, backend_args=self.backend_args) as local_path:
             self.coco = self.COCOAPI(local_path)
-        # The order of returned `cat_ids` will not
-        # change with the order of the `classes`
-        self.cat_ids = self.coco.get_cat_ids(
-            cat_names=self.metainfo['classes'])
+        
+        # The order of returned `cat_ids` will not change with the order of the `classes`
+        self.cat_ids = self.coco.get_cat_ids(cat_names=self.metainfo['classes'])
         self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
         self.cat_img_map = copy.deepcopy(self.coco.cat_img_map)
+
+        # Debug print statements
+        print(f"cat_ids: {self.cat_ids}")
+        print(f"cat2label: {self.cat2label}")
 
         img_ids = self.coco.get_img_ids()
         data_list = []
         total_ann_ids = []
-        #i = 0
         for img_id in img_ids:
-            #i+=1
             raw_img_info = self.coco.load_imgs([img_id])[0]
             raw_img_info['img_id'] = img_id
-            #if i<3: print(f"raw_img_info: {raw_img_info}")
-            
 
             ann_ids = self.coco.get_ann_ids(img_ids=[img_id])
             raw_ann_info = self.coco.load_anns(ann_ids)
-            #if i<3: print(f"raw_ann_info: {raw_ann_info}")
             total_ann_ids.extend(ann_ids)
-            #print(f"total_ann_ids: {total_ann_ids}")
 
             parsed_data_info = self.parse_data_info({
                 'raw_ann_info':
@@ -121,26 +118,17 @@ class CocoDataset(BaseDetDataset):
             data_info['custom_entities'] = True
 
         instances = []
-        # print(f"cow: {ann_info}")
-        # print(f"cow: {type(ann_info)}")
-        # print(f"cow: {len(ann_info)}")
         for i, ann in enumerate(ann_info):
             instance = {}
             if ann.get('ignore', False):
                 continue
-            #print(f"getting here 1")
             x1, y1, w, h = ann['bbox']
             inter_w = max(0, min(x1 + w, img_info['width']) - max(x1, 0))
             inter_h = max(0, min(y1 + h, img_info['height']) - max(y1, 0))
             if inter_w * inter_h == 0:
                 continue
-            #print(f"getting here 2")
             if ann['area'] <= 0 or w < 1 or h < 1:
                 continue
-            #print(f"getting here 3")
-            # if ann['category_id'] not in self.cat_ids:
-            #     continue
-            #print(f"getting here 4")
             bbox = [x1, y1, x1 + w, y1 + h]
 
             if ann.get('iscrowd', False):
@@ -148,11 +136,10 @@ class CocoDataset(BaseDetDataset):
             else:
                 instance['ignore_flag'] = 0
             instance['bbox'] = bbox
-            instance['bbox_label'] = 0 # ERIC CHANGED, (nevermind the following: 0 is background, 1 is #self.cat2label[ann['category_id']])
+            instance['bbox_label'] = self.cat2label[ann['category_id']]
 
             if ann.get('segmentation', None):
                 instance['mask'] = ann['segmentation']
-            #print(f"getting here 5")
 
             instances.append(instance)
         data_info['instances'] = instances
@@ -173,17 +160,10 @@ class CocoDataset(BaseDetDataset):
         filter_empty_gt = self.filter_cfg.get('filter_empty_gt', False)
         min_size = self.filter_cfg.get('min_size', 0)
 
-        # print(f"\nabc: {len(self.data_list)}")
-        # print(f"\123: {self.data_list[0]}")
-        
-        # obtain images that contain annotation
         ids_with_ann = set(data_info['img_id'] for data_info in self.data_list)
-        # obtain images that contain annotations of the required categories
         ids_in_cat = set()
         for i, class_id in enumerate(self.cat_ids):
             ids_in_cat |= set(self.cat_img_map[class_id])
-        # merge the image id sets of the two conditions and use the merged set
-        # to filter out images if self.filter_empty_gt=True
         ids_in_cat &= ids_with_ann
 
         valid_data_infos = []
@@ -191,11 +171,9 @@ class CocoDataset(BaseDetDataset):
             img_id = data_info['img_id']
             width = data_info['width']
             height = data_info['height']
-            # if filter_empty_gt and img_id not in ids_in_cat:  # ERIC CHANGED
-            #     continue
-            if data_info['instances'] == []: continue
+            if data_info['instances'] == []:
+                continue
             if min(width, height) >= min_size:
                 valid_data_infos.append(data_info)
 
-        #print(f"\nabc2: {len(valid_data_infos)}")
         return valid_data_infos
