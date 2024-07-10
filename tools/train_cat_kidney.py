@@ -12,16 +12,29 @@ import wandb
 import tools.utils as utils # Import your custom utils
 import sys
 import math  # Add this import
+from torch.cuda.amp import GradScaler, autocast
 
 # Initialize wandb
 wandb.init(project="cat_kidney_detection")
 
 class CocoDataset(Dataset):
-    def __init__(self, root, annFile, transforms=None):
+    def __init__(self, root, annFile, transforms=None, preload=False):
         self.root = root
         self.coco = COCO(annFile)
         self.ids = list(self.coco.imgs.keys())
         self.transforms = transforms
+        self.preload = preload
+        self.images = {}
+
+        if self.preload:
+            self._preload_images()
+
+    def _preload_images(self):
+        for img_id in self.ids:
+            img_info = self.coco.loadImgs(img_id)[0]
+            path = img_info['file_name']
+            img = Image.open(os.path.join(self.root, path)).convert("L")  # Convert to grayscale
+            self.images[img_id] = img
 
     def __getitem__(self, index):
         coco = self.coco
@@ -31,7 +44,10 @@ class CocoDataset(Dataset):
         img_info = coco.loadImgs(img_id)[0]
         path = img_info['file_name']
 
-        img = Image.open(os.path.join(self.root, path)).convert("L")  # Convert to grayscale
+        if self.preload:
+            img = self.images[img_id]
+        else:
+            img = Image.open(os.path.join(self.root, path)).convert("L")  # Convert to grayscale
 
         num_objs = len(anns)
         boxes = []
@@ -82,9 +98,9 @@ def evaluate(model, data_loader, device):
         outputs = model(images)
         for target, output in zip(targets, outputs):
             image_id = target["image_id"].item()
-            boxes = output["boxes"].cpu().numpy()
-            scores = output["scores"].cpu().numpy()
-            labels = output["labels"].cpu().numpy()
+            boxes = output["boxes"].detach().cpu().numpy()
+            scores = output["scores"].detach().cpu().numpy()
+            labels = output["labels"].detach().cpu().numpy()
             for box, score, label in zip(boxes, scores, labels):
                 coco_results.append({
                     "image_id": image_id,
@@ -112,13 +128,15 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
 
         lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
 
+    scaler = GradScaler()
+
     for images, targets in metric_logger.log_every(data_loader, print_freq, header):
         images = list(image.to(device) for image in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        loss_dict = model(images, targets)
-
-        losses = sum(loss for loss in loss_dict.values())
+        with autocast():
+            loss_dict = model(images, targets)
+            losses = sum(loss for loss in loss_dict.values())
 
         loss_dict_reduced = utils.reduce_dict(loss_dict)
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
@@ -131,8 +149,9 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
             sys.exit(1)
 
         optimizer.zero_grad()
-        losses.backward()
-        optimizer.step()
+        scaler.scale(losses).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         if lr_scheduler is not None:
             lr_scheduler.step()
@@ -157,18 +176,18 @@ def main():
 
     # Hyperparameters
     num_classes = 2  # 1 class (cat) + background
-    num_epochs = 5
+    num_epochs = 120
     batch_size = 2
     learning_rate = wandb.config.learning_rate  # Use wandb config for learning rate
     weight_decay = 0.0001
     momentum = 0.9
 
     # Dataset and DataLoader
-    train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True))
-    val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False))
+    train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=True)
+    val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=True)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4, collate_fn=collate_fn)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, collate_fn=collate_fn)
 
     # Model
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
