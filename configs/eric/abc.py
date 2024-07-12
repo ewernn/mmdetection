@@ -21,26 +21,37 @@ data_version = 'COCO_2/'
 backend_args = None
 
 img_norm_cfg = dict(mean=[123.675], std=[58.395], to_rgb=False)  # Adjusted for grayscale
+# train_pipeline = [
+#     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
+#     dict(type='LoadAnnotations', with_bbox=True),
+#     dict(type='RandomAffine', max_rotate_degree=20, scaling_ratio_range=(0.8, 1.2)),
+#     dict(type='Brightness', level=5),  # Adjust brightness
+#     dict(type='Normalize', **img_norm_cfg),
+#     dict(type='PackDetInputs',
+#          meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
+#                     'scale_factor', 'flip', 'flip_direction', 'batch_ids'))
+# ]
+img_norm_cfg = dict(mean=[123.675], std=[58.395], to_rgb=False)
 train_pipeline = [
     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
     dict(type='LoadAnnotations', with_bbox=True),
     #dict(type='RandomResize', scale=[(800, 800), (1000, 1000), (1200, 1200)], keep_ratio=True),
     #dict(type='RandomCrop', crop_size=(800, 800), allow_negative_crop=False),
     #dict(type='RandomFlip', prob=0.5),
-    dict(type='RandomAffine', scaling_ratio_range=(0.8, 1.2), max_rotate_degree=20, max_translate_ratio=0.1, border_val=0),
+    dict(type='RandomAffine', scaling_ratio_range=(0.9, 1.1), max_rotate_degree=15, max_translate_ratio=0.1, border_val=0),
     dict(type='RandomOrder', transforms=[
-        dict(type='Brightness', level=5),
+        dict(type='Brightness', level=2),
         #dict(type='Contrast', level=5),
         #dict(type='Equalize', prob=0.2),
-        dict(type='Sharpness', level=5),
+        dict(type='Sharpness', level=2),
     ]),
     dict(type='Normalize', **img_norm_cfg),
-    dict(type='PackDetInputs', meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'scale_factor', 'batch_ids'))
+    dict(type='PackDetInputs', meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'scale_factor', 'flip', 'flip_direction', 'batch_ids'))
 ]
 
 test_pipeline = [
     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
-    #dict(type='Resize', scale=(1000, 1000), keep_ratio=True),
+    dict(type='Resize', scale=(1000, 1000), keep_ratio=True),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
         type='PackDetInputs',
@@ -49,8 +60,8 @@ test_pipeline = [
 ]
 
 train_dataloader = dict(
-    batch_size=8,
-    num_workers=4,
+    batch_size=2,
+    num_workers=2,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     batch_sampler=dict(type='AspectRatioBatchSampler'),
@@ -63,8 +74,8 @@ train_dataloader = dict(
         pipeline=train_pipeline,
         backend_args=backend_args))
 val_dataloader = dict(
-    batch_size=8,
-    num_workers=4,
+    batch_size=1,
+    num_workers=2,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False),
@@ -77,8 +88,8 @@ val_dataloader = dict(
         pipeline=test_pipeline,
         backend_args=backend_args))
 test_dataloader = dict(
-    batch_size=8,
-    num_workers=4,
+    batch_size=1,
+    num_workers=2,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False),
