@@ -16,7 +16,7 @@ class CocoDataset(BaseDetDataset):
 
     METAINFO = {
         'classes':
-        ('left_kidney', 'right_kidney'),
+        ('right_kidney', 'left_kidney'),
         # ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train',
         #  'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign',
         #  'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep',

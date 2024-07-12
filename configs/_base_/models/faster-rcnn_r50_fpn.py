@@ -17,20 +17,20 @@ model = dict(
         norm_eval=True,
         style='pytorch',
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
-    # neck=dict(
-    #     type='FPN',
-    #     in_channels=[256, 512, 1024, 2048],
-    #     out_channels=256,
-    #     num_outs=5),
     neck=dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
-        num_outs=4,
-        start_level=0,  # Start from the smallest scale
-        end_level=3,    # End at the third scale (C4)
-        add_extra_convs=False,  # Remove extra convolutions
-    ),
+        num_outs=5),
+    # neck=dict(
+    #     type='FPN',
+    #     in_channels=[256, 512, 1024, 2048],
+    #     out_channels=256,
+    #     num_outs=4,
+    #     start_level=0,  # Start from the smallest scale
+    #     end_level=3,    # End at the third scale (C4)
+    #     add_extra_convs=False,  # Remove extra convolutions
+    # ),
     rpn_head=dict(
         type='RPNHead',
         in_channels=256,
@@ -39,7 +39,8 @@ model = dict(
             type='AnchorGenerator',
             ratios=[1.0, 1.2, 1.5],
             scales=[4, 8, 16],
-            strides=[4, 8, 16]),
+            #strides=[4, 8, 12, 16]),
+            strides=[4, 8, 12, 16, 32]),
         bbox_coder=dict(
             type='DeltaXYWHBBoxCoder',
             target_means=[0.0, 0.0, 0.0, 0.0],
@@ -53,7 +54,7 @@ model = dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),
             out_channels=256,
-            featmap_strides=[4, 8, 16, 32]),
+            featmap_strides=[4, 8, 12, 16, 32]),
         bbox_head=dict(
             type='Shared2FCBBoxHead',
             in_channels=256,
@@ -67,8 +68,8 @@ model = dict(
             reg_class_agnostic=False,
             loss_cls=dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-            #loss_bbox=dict(type='L1Loss', loss_weight=1.0),
-            loss_bbox=dict(loss_weight=1.0, type='GIoULoss'),
+            loss_bbox=dict(type='L1Loss', loss_weight=1.0),
+            #loss_bbox=dict(loss_weight=1.0, type='GIoULoss'),
         )
     ),
     # model training and testing settings
@@ -118,7 +119,7 @@ model = dict(
             nms=dict(type='nms', iou_threshold=0.7),
             min_bbox_size=0),
         rcnn=dict(
-            score_thr=0.05,
+            score_thr=0.01,
             nms=dict(type='nms', iou_threshold=0.5),
             max_per_img=100)
         # soft-nms is also supported for rcnn testing

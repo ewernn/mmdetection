@@ -35,21 +35,20 @@ train_pipeline = [
         dict(type='Sharpness', level=5),
     ]),
     dict(type='Normalize', **img_norm_cfg),
-    dict(type='PackDetInputs', meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'scale_factor', 'batch_ids'))
+    dict(type='PackDetInputs', meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'batch_ids', 'scale_factor'))
 ]
 
 test_pipeline = [
     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
-    #dict(type='Resize', scale=(1000, 1000), keep_ratio=True),
+    dict(type='Resize', scale=(1000, 1000), keep_ratio=True),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
         type='PackDetInputs',
-        meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
-                   'scale_factor'))
+        meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape','scale_factor'))
 ]
 
 train_dataloader = dict(
-    batch_size=8,
+    batch_size=4,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -63,7 +62,7 @@ train_dataloader = dict(
         pipeline=train_pipeline,
         backend_args=backend_args))
 val_dataloader = dict(
-    batch_size=8,
+    batch_size=4,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
@@ -77,7 +76,7 @@ val_dataloader = dict(
         pipeline=test_pipeline,
         backend_args=backend_args))
 test_dataloader = dict(
-    batch_size=8,
+    batch_size=4,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
