@@ -18,47 +18,11 @@ model = dict(
         depth=50,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
-        frozen_stages=1,
+        frozen_stages=0, # 1
         norm_cfg=dict(type='GN', num_groups=32, requires_grad=True),
         norm_eval=True,
         style='pytorch',
         init_cfg=None,#dict(type='Pretrained', checkpoint='/Users/ewern/Desktop/code/MetronMind/mmdetection/configs/eric/resnet50_grayscale_cleaned.pth'),
         in_channels=1,
-        # Added: Attention mechanism to enhance feature extraction
-        # plugins=[
-        #     dict(
-        #         cfg=dict(type='GeneralizedAttention', spatial_range=-1, num_heads=8, attention_type='0010', kv_stride=2),
-        #         stages=(False, False, True, True),
-        #         position='after_conv2'
-        #     )
-        # ]
     ),
-    neck=dict(
-        type='FPN',
-        in_channels=[256, 512, 1024, 2048],
-        out_channels=256,
-        num_outs=3,
-        start_level=1, # skip smallest scale (4,8,16,32)
-        # Added: Extra convolutions on input features
-        add_extra_convs='on_input',
-    ),
-    rpn_head=dict(
-        anchor_generator=dict(
-            type='AnchorGenerator',
-            # Modified: Adjusted scales for smaller objects
-            ratios=[1.2, 1.3],
-            strides = [8, 16, 32],
-            scales = [12, 16, 20],
-        ),
-        loss_bbox=dict(loss_weight=1.0, type='L1Loss'),
-        loss_cls=dict(loss_weight=0.5, type='FocalLoss', use_sigmoid=True, gamma=2.0, alpha=0.25),
-    ),
-    roi_head=dict(
-        bbox_head=dict(
-            # Modified: Set to 1 for kidney detection (assuming single class)
-            #loss_bbox=dict(loss_weight=1.0, type='GIoULoss'),
-            loss_cls=dict(loss_weight=0.5, type='FocalLoss', use_sigmoid=True, gamma=2.0, alpha=0.25),
-            num_classes=2
-        )
-    )
 )

@@ -17,24 +17,33 @@ model = dict(
         norm_eval=True,
         style='pytorch',
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
+    # neck=dict(
+    #     type='FPN',
+    #     in_channels=[256, 512, 1024, 2048],
+    #     out_channels=256,
+    #     num_outs=5),
     neck=dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
-        num_outs=5),
+        num_outs=4,
+        start_level=0,  # Start from the smallest scale
+        end_level=3,    # End at the third scale (C4)
+        add_extra_convs=False,  # Remove extra convolutions
+    ),
     rpn_head=dict(
         type='RPNHead',
         in_channels=256,
         feat_channels=256,
         anchor_generator=dict(
             type='AnchorGenerator',
-            scales=[8],
-            ratios=[0.5, 1.0, 2.0],
-            strides=[4, 8, 16, 32, 64]),
+            ratios=[1.0, 1.2, 1.5],
+            scales=[4, 8, 16],
+            strides=[4, 8, 16]),
         bbox_coder=dict(
             type='DeltaXYWHBBoxCoder',
-            target_means=[.0, .0, .0, .0],
-            target_stds=[1.0, 1.0, 1.0, 1.0]),
+            target_means=[0.0, 0.0, 0.0, 0.0],
+            target_stds=[0.1, 0.2676, 0.1, 0.1]), # Adjusted target_stds for RPN head
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
         loss_bbox=dict(type='L1Loss', loss_weight=1.0)),
@@ -50,15 +59,18 @@ model = dict(
             in_channels=256,
             fc_out_channels=1024,
             roi_feat_size=7,
-            num_classes=80,
+            num_classes=2,
             bbox_coder=dict(
                 type='DeltaXYWHBBoxCoder',
-                target_means=[0., 0., 0., 0.],
-                target_stds=[0.1, 0.1, 0.2, 0.2]),
+                target_means=[0.0, 0.0, 0.0, 0.0],
+                target_stds=[0.05, 0.1338, 0.0645, 0.0645]), # Adjusted target_stds for ROI head
             reg_class_agnostic=False,
             loss_cls=dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-            loss_bbox=dict(type='L1Loss', loss_weight=1.0))),
+            #loss_bbox=dict(type='L1Loss', loss_weight=1.0),
+            loss_bbox=dict(loss_weight=1.0, type='GIoULoss'),
+        )
+    ),
     # model training and testing settings
     train_cfg=dict(
         rpn=dict(
@@ -112,4 +124,3 @@ model = dict(
         # soft-nms is also supported for rcnn testing
         # e.g., nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.05)
     ))
-

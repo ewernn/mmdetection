@@ -46,12 +46,11 @@ def create_coco_format_subset(df, images_dir, output_json_path, subset_name):
     images = []
     annotations = []
     categories = [
-        {'id': 1, 'name': 'left_kidney'},
-        {'id': 2, 'name': 'right_kidney'}
+        {'id': 1, 'name': 'right_kidney'},
+        {'id': 2, 'name': 'left_kidney'}
     ]
     
     annotation_id = 1
-    abs_counter = 0  # Initialize the counter
     
     for idx, row in df.iterrows():
         image_filename = row['Image']
@@ -59,51 +58,49 @@ def create_coco_format_subset(df, images_dir, output_json_path, subset_name):
         with Image.open(image_path) as img:
             width, height = img.size
         
-        images.append({
-            'id': idx + 1,
-            'width': width,
-            'height': height,
-            'file_name': image_filename,
-        })
-        
         coords = []
         for i in range(1, 5):
             x, y = row.get(f'x{i}'), row.get(f'y{i}')
             if pd.notna(x) and pd.notna(y):
                 coords.append((float(x) * width, float(y) * height))
         
+        valid_boxes = []
         for i in range(0, len(coords), 2):
-            x, y = coords[i]
             if i + 1 < len(coords):
+                x, y = coords[i]
                 x2, y2 = coords[i + 1]
-                width_diff = x2 - x
-                height_diff = y2 - y
-                bbox_width = abs(width_diff)
-                bbox_height = abs(height_diff)
+                bbox_width = abs(x2 - x)
+                bbox_height = abs(y2 - y)
+                bbox_area = bbox_width * bbox_height
+                bbox_y = min(y, y2)
                 
-                # Increment counter only if abs() changed a negative value to positive
-                if width_diff < 0:
-                    abs_counter += 1
-                if height_diff < 0:
-                    abs_counter += 1
-            else:
-                bbox_width = bbox_height = 10
-            
-            bbox = [min(x, x2), min(y, y2), bbox_width, bbox_height]
-            
-            # Determine the category_id based on the index
-            category_id = 1 if i == 0 else 2  # 1 for left_kidney, 2 for right_kidney
-            
-            annotations.append({
-                'id': annotation_id,
-                'image_id': idx + 1,
-                'category_id': category_id,
-                'bbox': bbox,
-                'area': bbox_width * bbox_height,
-                'iscrowd': 0,
-                'segmentation': [],
+                if bbox_area <= 20474 and 20 <= bbox_y <= 875:
+                    valid_boxes.append([min(x, x2), bbox_y, bbox_width, bbox_height])
+        
+        if len(valid_boxes) == 2:
+            images.append({
+                'id': idx + 1,
+                'width': width,
+                'height': height,
+                'file_name': image_filename,
             })
-            annotation_id += 1
+            
+            # Sort boxes by x-coordinate
+            valid_boxes.sort(key=lambda box: box[0])
+            
+            for i, bbox in enumerate(valid_boxes):
+                category_id = 1 if i == 0 else 2  # 1 for right_kidney, 2 for left_kidney
+                
+                annotations.append({
+                    'id': annotation_id,
+                    'image_id': idx + 1,
+                    'category_id': category_id,
+                    'bbox': bbox,
+                    'area': bbox[2] * bbox[3],
+                    'iscrowd': 0,
+                    'segmentation': [],
+                })
+                annotation_id += 1
     
     coco_format_json = {
         'images': images,
@@ -115,11 +112,13 @@ def create_coco_format_subset(df, images_dir, output_json_path, subset_name):
     with open(subset_output_path, 'w') as f:
         json.dump(coco_format_json, f, indent=4)
 
-    print(f"abs() function changed {abs_counter} negative values to positive for subset: {subset_name}")
+    print(f"Created COCO format subset: {subset_name}")
+    print(f"Total images: {len(images)}")
+    print(f"Total annotations: {len(annotations)}")
 
 # Usage
 data_csv_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Data.csv'  # Update with your actual path
 images_dir = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset'               # Update with your actual path to images directory
-output_json_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-json-2-class'  # Update with your desired output path
+output_json_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-json-2-class-filtered'  # Update with your desired output path
 
 create_coco_format(data_csv_path, images_dir, output_json_path)
