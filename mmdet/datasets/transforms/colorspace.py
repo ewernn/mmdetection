@@ -233,7 +233,13 @@ class Contrast(ColorTransform):
     def _transform_img(self, results: dict, mag: float) -> None:
         """Adjust the image contrast."""
         img = results['img']
-        results['img'] = mmcv.adjust_contrast(img, mag).astype(img.dtype)
+        if img.ndim == 2 or (img.ndim == 3 and img.shape[2] == 1):
+            # Grayscale image
+            mean = img.mean()
+            results['img'] = (mag * (img - mean) + mean).clip(0, 255).astype(img.dtype)
+        else:
+            # Color image (BGR)
+            results['img'] = mmcv.adjust_contrast(img, mag).astype(img.dtype)
 
 
 @TRANSFORMS.register_module()

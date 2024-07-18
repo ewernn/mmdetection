@@ -119,6 +119,6 @@ def create_coco_format_subset(df, images_dir, output_json_path, subset_name):
 # Usage
 data_csv_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Data.csv'  # Update with your actual path
 images_dir = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset'               # Update with your actual path to images directory
-output_json_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-json-2-class-filtered'  # Update with your desired output path
+output_json_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-high_quality'  # Update with your desired output path
 
 create_coco_format(data_csv_path, images_dir, output_json_path)
