@@ -14,12 +14,12 @@ model = dict(
         pad_size_divisor=32
     ),
     backbone=dict(
-        type='ResNet',
+        type='ResNetGray',
         depth=101,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
-        norm_cfg=dict(type='BN', requires_grad=True),  # Change to BN
+        norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=False,
         style='pytorch',
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet101'),
@@ -64,14 +64,6 @@ model = dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
             loss_bbox=dict(type='GIoULoss', loss_weight=10.0))),
 )
-
-# Custom hook to modify the first convolutional layer
-custom_hooks = [
-    dict(
-        type='ModifyFirstConvHook',
-        in_channels=1
-    )
-]
 
 # Training schedule and learning rate changes
 train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=200, val_interval=1)
