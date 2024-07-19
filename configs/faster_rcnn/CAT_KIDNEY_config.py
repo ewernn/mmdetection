@@ -19,7 +19,7 @@ model = dict(
         num_stages=4,
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
-        norm_cfg=dict(type='GN', num_groups=32, requires_grad=True),
+        norm_cfg=dict(type='BN', requires_grad=True),  # Change to BN
         norm_eval=False,
         style='pytorch',
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet101'),
@@ -65,6 +65,14 @@ model = dict(
             loss_bbox=dict(type='GIoULoss', loss_weight=10.0))),
 )
 
+# Custom hook to modify the first convolutional layer
+custom_hooks = [
+    dict(
+        type='ModifyFirstConvHook',
+        in_channels=1
+    )
+]
+
 # Training schedule and learning rate changes
 train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=200, val_interval=1)
 param_scheduler = [
@@ -77,9 +85,9 @@ param_scheduler = [
     ),
     dict(
         type='CosineAnnealingLR',
-        T_max=98,
+        T_max=198,  # Total number of epochs - 2 (to account for the linear warmup)
         eta_min=1e-6,
-        begin=2000,
+        begin=2,  # Start after the linear warmup
         end=200,
         by_epoch=True
     )
