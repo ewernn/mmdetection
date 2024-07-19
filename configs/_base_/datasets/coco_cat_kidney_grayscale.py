@@ -21,34 +21,22 @@ data_version = 'COCO_2/'
 backend_args = None
 
 img_norm_cfg = dict(mean=[123.675], std=[58.395], to_rgb=False)  # Adjusted for grayscale
+
+# Data augmentation changes (14)
 train_pipeline = [
     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='RandomAffine', scaling_ratio_range=(0.95, 1.05), max_rotate_degree=10, max_translate_ratio=0.05, border_val=0),
     dict(type='RandomOrder', transforms=[
-        dict(type='Contrast', prob=0.3, level=None, min_mag=0.9, max_mag=1.1),
+        dict(type='Brightness', prob=0.3, level=None, min_mag=0.95, max_mag=1.05),
+        dict(type='Contrast', prob=0.6, level=None, min_mag=0.75, max_mag=1.25),
         dict(type='Sharpness', prob=0.2, level=None, min_mag=0.9, max_mag=1.1),
     ]),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='PackDetInputs', meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'batch_ids', 'scale_factor'))
 ]
-# train_pipeline = [
-#     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
-#     dict(type='LoadAnnotations', with_bbox=True),
-#     #dict(type='RandomResize', scale=[(800, 800), (1000, 1000), (1200, 1200)], keep_ratio=True),
-#     #dict(type='RandomCrop', crop_size=(800, 800), allow_negative_crop=False),
-#     #dict(type='RandomFlip', prob=0.5),
-#     dict(type='RandomAffine', scaling_ratio_range=(0.8, 1.2), max_rotate_degree=20, max_translate_ratio=0.1, border_val=0),
-#     dict(type='RandomOrder', transforms=[
-#         dict(type='Brightness', level=5),
-#         dict(type='Contrast', level=5),
-#         #dict(type='Equalize', prob=0.2),
-#         dict(type='Sharpness', level=5),
-#     ]),
-#     dict(type='Normalize', **img_norm_cfg),
-#     dict(type='PackDetInputs', meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape', 'batch_ids', 'scale_factor'))
-# ]
 
+# Update test pipeline
 test_pipeline = [
     dict(type='LoadImageFromFile', color_type='grayscale', backend_args=backend_args),
     dict(type='Resize', scale=(1000, 1000), keep_ratio=True),
@@ -58,6 +46,7 @@ test_pipeline = [
         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape','scale_factor'))
 ]
 
+# Update dataloaders
 train_dataloader = dict(
     batch_size=4,
     num_workers=4,
@@ -68,10 +57,10 @@ train_dataloader = dict(
         type=dataset_type,
         data_root=data_root,
         ann_file=data_version + 'train_Data_coco_format.json',
-        #data_prefix=dict(img='train2017/'),
         filter_cfg=dict(filter_empty_gt=True, min_size=32),
         pipeline=train_pipeline,
         backend_args=backend_args))
+
 val_dataloader = dict(
     batch_size=4,
     num_workers=4,
@@ -82,10 +71,10 @@ val_dataloader = dict(
         type=dataset_type,
         data_root=data_root,
         ann_file=data_version + 'val_Data_coco_format.json',
-        #data_prefix=dict(img='val2017/'),
         test_mode=True,
         pipeline=test_pipeline,
         backend_args=backend_args))
+
 test_dataloader = dict(
     batch_size=4,
     num_workers=4,
@@ -96,11 +85,11 @@ test_dataloader = dict(
         type=dataset_type,
         data_root=data_root,
         ann_file=data_version + 'test_Data_coco_format.json',
-        #data_prefix=dict(img='val2017/'),
         test_mode=True,
         pipeline=test_pipeline,
         backend_args=backend_args))
 
+# Update evaluation settings
 val_evaluator = dict(
     type='CocoMetric',
     ann_file=data_root + data_version + 'val_Data_coco_format.json',
