@@ -18,12 +18,14 @@ model = dict(
         depth=101,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
-        frozen_stages=1,
+        frozen_stages=-1,  # Unfreeze all stages
+        #frozen_stages=1,
         norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=False,
         style='pytorch',
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet101'),
-        in_channels=1,
+        init_cfg=None  # Remove pretrained weights
+        #init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet101'),
+
     ),
     neck=dict(
         type='FPN',
@@ -77,9 +79,9 @@ param_scheduler = [
     ),
     dict(
         type='CosineAnnealingLR',
-        T_max=198,  # Total number of epochs - 2 (to account for the linear warmup)
+        T_max=198,
         eta_min=1e-6,
-        begin=2,  # Start after the linear warmup
+        begin=2,
         end=200,
         by_epoch=True
     )
