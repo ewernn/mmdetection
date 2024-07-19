@@ -18,11 +18,13 @@ model = dict(
         depth=101,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
-        frozen_stages=1,  # Freeze only the first stage
+        frozen_stages=-1,
+        # frozen_stages=1,  # Freeze only the first stage
         norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=False,
         style='pytorch',
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet101')
+        init_cfg=None
+        #init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet101')
     ),
     neck=dict(
         type='FPN',
