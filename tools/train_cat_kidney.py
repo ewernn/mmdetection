@@ -14,7 +14,8 @@ import sys
 import math  # Add this import
 import argparse
 import random  # Add this import
-from torchvision.models.detection import fasterrcnn_resnet101_fpn_v2, FasterRCNN_ResNet101_FPN_V2_Weights
+from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.anchor_utils import AnchorGenerator
 from torch.cuda.amp import GradScaler, autocast	
 
@@ -243,27 +244,27 @@ def main():
     )
 
     # Model
-    weights = FasterRCNN_ResNet101_FPN_V2_Weights.DEFAULT
-    model = fasterrcnn_resnet101_fpn_v2(
-        weights=weights,
-        rpn_anchor_generator=anchor_generator,
-        # RPN parameters
-        rpn_pre_nms_top_n_train=200,
-        rpn_pre_nms_top_n_test=100,
-        rpn_post_nms_top_n_train=200,
-        rpn_post_nms_top_n_test=100,
-        rpn_nms_thresh=0.7,
-        rpn_fg_iou_thresh=0.7,
-        rpn_bg_iou_thresh=0.3,
-        rpn_batch_size_per_image=128,
-        rpn_positive_fraction=0.5,
-        # ROI parameters
-        box_batch_size_per_image=128,
-        box_positive_fraction=0.5,
-        box_score_thresh=0.1,
-        box_nms_thresh=0.5,
-        box_detections_per_img=5
-    )
+    weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
+    model = fasterrcnn_resnet50_fpn(weights=weights)
+    
+    # Replace the classifier with a new one for your number of classes
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+
+    # Modify anchor sizes and aspect ratios
+    model.rpn.anchor_generator = anchor_generator
+
+    # Modify other RPN and ROI parameters
+    model.rpn.pre_nms_top_n = dict(training=200, testing=100)
+    model.rpn.post_nms_top_n = dict(training=200, testing=100)
+    model.rpn.nms_thresh = 0.7
+    model.rpn.fg_iou_thresh = 0.7
+    model.rpn.bg_iou_thresh = 0.3
+    model.roi_heads.batch_size_per_image = 128
+    model.roi_heads.positive_fraction = 0.5
+    model.roi_heads.score_thresh = 0.1
+    model.roi_heads.nms_thresh = 0.5
+    model.roi_heads.detections_per_img = 5
 
     # All layers are unfrozen by default, so no need to explicitly unfreeze
 
