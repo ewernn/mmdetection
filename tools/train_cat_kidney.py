@@ -253,8 +253,6 @@ def main():
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
     # Modify other RPN and ROI parameters
-    model.rpn.pre_nms_top_n = dict(training=200, testing=100)
-    model.rpn.post_nms_top_n = dict(training=200, testing=100)
     model.rpn.nms_thresh = 0.7
     model.rpn.fg_iou_thresh = 0.7
     model.rpn.bg_iou_thresh = 0.3
@@ -263,6 +261,10 @@ def main():
     model.roi_heads.score_thresh = 0.1
     model.roi_heads.nms_thresh = 0.5
     model.roi_heads.detections_per_img = 5
+
+    # Set pre_nms_top_n and post_nms_top_n correctly
+    model.rpn.pre_nms_top_n = lambda: 200  # for both training and testing
+    model.rpn.post_nms_top_n = lambda: 100  # for both training and testing
 
     # All layers are unfrozen by default, so no need to explicitly unfreeze
 
