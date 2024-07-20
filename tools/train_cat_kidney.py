@@ -203,8 +203,10 @@ def main():
     # Paths
     if use_colab:
         data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
+        checkpoint_dir = '/content/drive/MyDrive/MM/CatKidney/exps'
     else:
         data_root = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset'
+        checkpoint_dir = '/Users/ewern/Desktop/code/MetronMind/cat_exps'
     
     train_ann_file = os.path.join(data_root, 'COCO_2/train_Data_coco_format.json')
     val_ann_file = os.path.join(data_root, 'COCO_2/val_Data_coco_format.json')
@@ -213,7 +215,7 @@ def main():
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
     num_epochs = 120
     batch_size = 1
-    learning_rate = 0.001  # Default learning rate if not using wandb
+    learning_rate = 0.0001  # Default learning rate if not using wandb
     weight_decay = 0.0001
     momentum = 0.9
 
@@ -252,13 +254,39 @@ def main():
     # Learning rate scheduler
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-5)
 
+    # Create a directory for checkpoints
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    best_mAP = 0.0
+
     # Training loop
     for epoch in range(num_epochs):
         train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=10)
         lr_scheduler.step()
-        torch.save(model.state_dict(), f"model_epoch_{epoch}.pth")
+        
+        # Evaluate on validation set
+        mAP = evaluate(model, val_loader, device)
+        
+        # Save the best model
+        if mAP > best_mAP:
+            best_mAP = mAP
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'mAP': mAP,
+            }, os.path.join(checkpoint_dir, 'best_model.pth'))
+        
+        # Save regular checkpoint
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'mAP': mAP,
+        }, os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pth'))
 
-    print("Training complete.")
+    print(f"Training complete. Best mAP: {best_mAP}")
+    print(f"Checkpoints saved in: {checkpoint_dir}")
 
 if __name__ == "__main__":
     main()
