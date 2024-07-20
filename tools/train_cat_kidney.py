@@ -15,6 +15,7 @@ import math  # Add this import
 import argparse
 import random  # Add this import
 from torchvision.models.detection.faster_rcnn import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
+from torch.cuda.amp import GradScaler, autocast	
 
 # Initialize global variables
 use_wandb = False
