@@ -296,7 +296,7 @@ def main():
 
     # Training loop
     for epoch in range(num_epochs):
-        train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=10)
+        train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)  # Updated print_freq
         lr_scheduler.step()
         
         # Evaluate on validation set
