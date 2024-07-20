@@ -15,6 +15,7 @@ import math  # Add this import
 import argparse
 import random  # Add this import
 from torchvision.models.detection import fasterrcnn_resnet152_fpn_v2, FasterRCNN_ResNet152_FPN_V2_Weights
+from torchvision.models.detection.anchor_utils import AnchorGenerator
 from torch.cuda.amp import GradScaler, autocast	
 
 # Initialize global variables
@@ -233,18 +234,44 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, collate_fn=collate_fn)
 
+    # Define custom anchor generator
+    anchor_sizes = ((32,), (64,), (128,), (256,))
+    aspect_ratios = ((1.0, 1.2, 1.5),) * len(anchor_sizes)
+    anchor_generator = AnchorGenerator(
+        sizes=anchor_sizes,
+        aspect_ratios=aspect_ratios
+    )
+
     # Model
     weights = FasterRCNN_ResNet152_FPN_V2_Weights.DEFAULT
-    model = fasterrcnn_resnet152_fpn_v2(weights=weights)
+    model = fasterrcnn_resnet152_fpn_v2(
+        weights=weights,
+        rpn_anchor_generator=anchor_generator,
+        # RPN parameters
+        rpn_pre_nms_top_n_train=200,
+        rpn_pre_nms_top_n_test=100,
+        rpn_post_nms_top_n_train=200,
+        rpn_post_nms_top_n_test=100,
+        rpn_nms_thresh=0.7,
+        rpn_fg_iou_thresh=0.7,
+        rpn_bg_iou_thresh=0.3,
+        rpn_batch_size_per_image=128,
+        rpn_positive_fraction=0.5,
+        # ROI parameters
+        box_batch_size_per_image=128,
+        box_positive_fraction=0.5,
+        box_score_thresh=0.1,
+        box_nms_thresh=0.5,
+        box_detections_per_img=5
+    )
 
-    # Print RPN and ROI details
-    print("RPN details:")
-    print(model.rpn)
-    print("\nROI details:")
-    print(model.roi_heads)
+    # All layers are unfrozen by default, so no need to explicitly unfreeze
 
-    in_features = model.roi_heads.box_predictor.cls_score.in_features
-    model.roi_heads.box_predictor = torchvision.models.detection.faster_rcnn.FastRCNNPredictor(in_features, num_classes)
+    # Print the trainable status of layers
+    print("\nTrainable status of layers:")
+    for name, param in model.named_parameters():
+        if 'backbone' in name:
+            print(f"{name}: {param.requires_grad}")
 
     if use_colab:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -254,12 +281,12 @@ def main():
     print(f"Using device: {device}")
     model.to(device)
 
-    # Optimizer
+    # Optimizer with lower learning rate
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+    optimizer = torch.optim.SGD(params, lr=1e-5, momentum=0.9, weight_decay=0.0005)
 
     # Learning rate scheduler
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-5)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
     # Create a directory for checkpoints
     os.makedirs(checkpoint_dir, exist_ok=True)
