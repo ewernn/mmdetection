@@ -89,10 +89,20 @@ def get_transform(train):
     transforms = []
     transforms.append(T.ToTensor())
     if train:
-        transforms.append(T.RandomHorizontalFlip(0.5))
-        #transforms.append(T.RandomCrop((800, 800)))
-        transforms.append(T.RandomAffine(degrees=20, scale=(0.8, 1.2), translate=(0.1, 0.1)))
-        transforms.append(T.ColorJitter(brightness=0.5, contrast=0.5))#, sharpness=0.5))
+        transforms.extend([
+            T.RandomAffine(
+                degrees=(-5, 5),  # Slight rotation
+                translate=(0.05, 0.05),  # Small translations
+                scale=(0.95, 1.05),  # Slight scaling
+                fill=0  # Fill empty areas with black
+            ),
+            T.ColorJitter(
+                brightness=0.2,
+                contrast=0.2
+            ),
+            T.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),  # Slight blurring
+            T.RandomAdjustSharpness(sharpness_factor=1.5, p=0.3),  # Occasional sharpening
+        ])
     return T.Compose(transforms)
 
 def collate_fn(batch):
