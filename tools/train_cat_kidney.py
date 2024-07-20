@@ -236,7 +236,7 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, collate_fn=collate_fn)
 
     # Define custom anchor generator
-    anchor_sizes = ((32,), (64,), (128,), (256,))
+    anchor_sizes = ((32,), (64,), (128,), (256,), (512,))  # 5 feature map levels
     aspect_ratios = ((1.0, 1.2, 1.5),) * len(anchor_sizes)
     anchor_generator = AnchorGenerator(
         sizes=anchor_sizes,
