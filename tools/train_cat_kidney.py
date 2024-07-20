@@ -14,7 +14,7 @@ import sys
 import math  # Add this import
 import argparse
 import random  # Add this import
-from torchvision.models.detection import fasterrcnn_resnet152_fpn_v2, FasterRCNN_ResNet152_FPN_V2_Weights
+from torchvision.models.detection import fasterrcnn_resnet101_fpn_v2, FasterRCNN_ResNet101_FPN_V2_Weights
 from torchvision.models.detection.anchor_utils import AnchorGenerator
 from torch.cuda.amp import GradScaler, autocast	
 
@@ -243,8 +243,8 @@ def main():
     )
 
     # Model
-    weights = FasterRCNN_ResNet152_FPN_V2_Weights.DEFAULT
-    model = fasterrcnn_resnet152_fpn_v2(
+    weights = FasterRCNN_ResNet101_FPN_V2_Weights.DEFAULT
+    model = fasterrcnn_resnet101_fpn_v2(
         weights=weights,
         rpn_anchor_generator=anchor_generator,
         # RPN parameters
