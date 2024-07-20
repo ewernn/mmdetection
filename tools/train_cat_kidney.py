@@ -13,6 +13,7 @@ import tools.utils as utils # Import your custom utils
 import sys
 import math  # Add this import
 import argparse
+import random  # Add this import
 from torchvision.models.detection.faster_rcnn import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
 
 # Initialize global variables
@@ -20,10 +21,13 @@ use_wandb = False
 use_colab = False
 
 class CocoDataset(Dataset):
-    def __init__(self, root, annFile, transforms=None, preload=False):
+    def __init__(self, root, annFile, transforms=None, preload=False, only_10=False):
         self.root = root
         self.coco = COCO(annFile)
         self.ids = list(self.coco.imgs.keys())
+        if only_10:
+            random.shuffle(self.ids)
+            self.ids = self.ids[:10]
         self.transforms = transforms
         self.preload = preload
         self.images = {}
@@ -185,10 +189,12 @@ def main():
     parser = argparse.ArgumentParser(description='Train Cat Kidney Detection Model')
     parser.add_argument('--wandb', action='store_true', help='Use Weights & Biases for logging')
     parser.add_argument('--colab', action='store_true', help='Use Google Colab data path')
+    parser.add_argument('--only_10', action='store_true', help='Use only 10 samples for quick testing')
     args = parser.parse_args()
 
     use_wandb = args.wandb
     use_colab = args.colab
+    only_10 = args.only_10
 
     if use_wandb:
         wandb.init(project="cat_kidney_detection")
@@ -214,8 +220,12 @@ def main():
         learning_rate = wandb.config.learning_rate  # Use wandb config for learning rate
 
     # Dataset and DataLoader
-    train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=True)
-    val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=True)
+    train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=True, only_10=only_10)
+    val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=True, only_10=only_10)
+
+    # Adjust num_epochs if only_10 is True
+    if only_10:
+        num_epochs = min(num_epochs, 10)  # Limit to 10 epochs for quick testing
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, collate_fn=collate_fn)
