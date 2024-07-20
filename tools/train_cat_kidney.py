@@ -245,14 +245,12 @@ def main():
 
     # Model
     weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
-    model = fasterrcnn_resnet50_fpn(weights=weights)
+    model = fasterrcnn_resnet50_fpn(weights=weights, 
+                                    rpn_anchor_generator=anchor_generator)
     
     # Replace the classifier with a new one for your number of classes
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-
-    # Modify anchor sizes and aspect ratios
-    model.rpn.anchor_generator = anchor_generator
 
     # Modify other RPN and ROI parameters
     model.rpn.pre_nms_top_n = dict(training=200, testing=100)
