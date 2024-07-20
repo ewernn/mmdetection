@@ -12,10 +12,12 @@ import wandb
 import tools.utils as utils # Import your custom utils
 import sys
 import math  # Add this import
-from torch.cuda.amp import GradScaler, autocast
+import argparse
+from torchvision.models.detection.faster_rcnn import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
 
-# Initialize wandb
-wandb.init(project="cat_kidney_detection")
+# Initialize global variables
+use_wandb = False
+use_colab = False
 
 class CocoDataset(Dataset):
     def __init__(self, root, annFile, transforms=None, preload=False):
@@ -81,7 +83,7 @@ def get_transform(train):
     transforms.append(T.ToTensor())
     if train:
         transforms.append(T.RandomHorizontalFlip(0.5))
-        transforms.append(T.RandomCrop((800, 800)))
+        #transforms.append(T.RandomCrop((800, 800)))
         transforms.append(T.RandomAffine(degrees=20, scale=(0.8, 1.2), translate=(0.1, 0.1)))
         transforms.append(T.ColorJitter(brightness=0.5, contrast=0.5))#, sharpness=0.5))
     return T.Compose(transforms)
@@ -125,16 +127,20 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     if epoch == 0:
         warmup_factor = 1. / 1000
         warmup_iters = min(1000, len(data_loader) - 1)
-
         lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
 
-    scaler = GradScaler()
+    use_amp = device.type == 'cuda'
+    scaler = GradScaler() if use_amp else None
 
     for images, targets in metric_logger.log_every(data_loader, print_freq, header):
         images = list(image.to(device) for image in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        with autocast():
+        if use_amp:
+            with autocast():
+                loss_dict = model(images, targets)
+                losses = sum(loss for loss in loss_dict.values())
+        else:
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
 
@@ -149,9 +155,13 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
             sys.exit(1)
 
         optimizer.zero_grad()
-        scaler.scale(losses).backward()
-        scaler.step(optimizer)
-        scaler.update()
+        if use_amp:
+            scaler.scale(losses).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            losses.backward()
+            optimizer.step()
 
         if lr_scheduler is not None:
             lr_scheduler.step()
@@ -160,27 +170,48 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
         # Log metrics to wandb
-        wandb.log({"loss": loss_value, "lr": optimizer.param_groups[0]["lr"]})
+        if use_wandb:
+            wandb.log({"loss": loss_value, "lr": optimizer.param_groups[0]["lr"]})
 
     # Evaluate and log mAP
     mAP = evaluate(model, data_loader, device)
-    wandb.log({"mAP": mAP})
+    if use_wandb:
+        wandb.log({"mAP": mAP})
 
     return metric_logger
 
 def main():
+    global use_wandb, use_colab
+    parser = argparse.ArgumentParser(description='Train Cat Kidney Detection Model')
+    parser.add_argument('--wandb', action='store_true', help='Use Weights & Biases for logging')
+    parser.add_argument('--colab', action='store_true', help='Use Google Colab data path')
+    args = parser.parse_args()
+
+    use_wandb = args.wandb
+    use_colab = args.colab
+
+    if use_wandb:
+        wandb.init(project="cat_kidney_detection")
+
     # Paths
-    data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
+    if use_colab:
+        data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
+    else:
+        data_root = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset'
+    
     train_ann_file = os.path.join(data_root, 'COCO_2/train_Data_coco_format.json')
     val_ann_file = os.path.join(data_root, 'COCO_2/val_Data_coco_format.json')
 
     # Hyperparameters
-    num_classes = 2  # 1 class (cat) + background
+    num_classes = 3  # Background (0), left kidney (1), right kidney (2)
     num_epochs = 120
-    batch_size = 2
-    learning_rate = wandb.config.learning_rate  # Use wandb config for learning rate
+    batch_size = 1
+    learning_rate = 0.001  # Default learning rate if not using wandb
     weight_decay = 0.0001
     momentum = 0.9
+
+    if use_wandb:
+        learning_rate = wandb.config.learning_rate  # Use wandb config for learning rate
 
     # Dataset and DataLoader
     train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=True)
@@ -190,11 +221,17 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, collate_fn=collate_fn)
 
     # Model
-    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
+    weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
+    model = fasterrcnn_resnet50_fpn_v2(weights=weights)
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = torchvision.models.detection.faster_rcnn.FastRCNNPredictor(in_features, num_classes)
 
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    if use_colab:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    else:
+        device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+    
+    print(f"Using device: {device}")
     model.to(device)
 
     # Optimizer
