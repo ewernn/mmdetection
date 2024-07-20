@@ -225,10 +225,10 @@ def main():
 
     # Hyperparameters
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
-    num_epochs = 120
-    batch_size = 4  # Updated batch size
-    learning_rate = 0.0001  # Default learning rate if not using wandb
-    weight_decay = 0.0001
+    num_epochs = 300  # Increased from 120 to 300
+    batch_size = 4
+    learning_rate = 0.0001
+    weight_decay = 0.0005  # Slightly increased from 0.0001
     momentum = 0.9
 
     if use_wandb:
