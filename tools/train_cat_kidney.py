@@ -14,7 +14,7 @@ import sys
 import math  # Add this import
 import argparse
 import random  # Add this import
-from torchvision.models.detection.faster_rcnn import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
+from torchvision.models.detection import fasterrcnn_resnet152_fpn_v2, FasterRCNN_ResNet152_FPN_V2_Weights
 from torch.cuda.amp import GradScaler, autocast	
 
 # Initialize global variables
@@ -214,7 +214,7 @@ def main():
     # Hyperparameters
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
     num_epochs = 120
-    batch_size = 1
+    batch_size = 4  # Updated batch size
     learning_rate = 0.0001  # Default learning rate if not using wandb
     weight_decay = 0.0001
     momentum = 0.9
@@ -234,8 +234,15 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, collate_fn=collate_fn)
 
     # Model
-    weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
-    model = fasterrcnn_resnet50_fpn_v2(weights=weights)
+    weights = FasterRCNN_ResNet152_FPN_V2_Weights.DEFAULT
+    model = fasterrcnn_resnet152_fpn_v2(weights=weights)
+
+    # Print RPN and ROI details
+    print("RPN details:")
+    print(model.rpn)
+    print("\nROI details:")
+    print(model.roi_heads)
+
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = torchvision.models.detection.faster_rcnn.FastRCNNPredictor(in_features, num_classes)
 
