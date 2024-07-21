@@ -18,7 +18,7 @@ parameters:
   aspect_ratios:
     values:
       - "((0.5, 1.0, 2.0),)"
-      - "((0.8, 1.0, 1.3),)"
+      - "((0.9, 1.1, 1.4),)"
   backbone:
     values: ["resnet101", "resnet152"]
   batch_size:
