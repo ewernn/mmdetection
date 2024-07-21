@@ -99,18 +99,21 @@ def get_transform(train):
     if train:
         transforms.extend([
             T.RandomAffine(
-                degrees=(-5, 5),  # Slight rotation
-                translate=(0.05, 0.05),  # Small translations
-                scale=(0.95, 1.05),  # Slight scaling
-                fill=0  # Fill empty areas with black
+                degrees=(-5, 5),
+                translate=(0.05, 0.05),
+                scale=(0.95, 1.05),
+                fill=0
             ),
-            T.ColorJitter(
-                brightness=0.2,
-                contrast=0.2
-            ),
-            T.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),  # Slight blurring
-            T.RandomAdjustSharpness(sharpness_factor=1.5, p=0.3),  # Occasional sharpening
+            T.RandomAutocontrast(p=0.5),
+            T.Lambda(lambda x: TF.adjust_brightness(x, brightness_factor=random.uniform(0.8, 1.2))),
+            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.8, 1.2))),
+            T.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
+            T.RandomAdjustSharpness(sharpness_factor=1.5, p=0.3),
         ])
+    
+    # Expand grayscale to 3 channels
+    transforms.append(T.Lambda(lambda x: x.repeat(3, 1, 1) if x.shape[0] == 1 else x))
+    
     return T.Compose(transforms)
 
 def collate_fn(batch):
@@ -206,31 +209,11 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     return metric_logger
 
 def create_model(args, num_classes, anchor_generator):
-    if args.resnet152:
-        print("Using ResNet-152 as backbone")
-        backbone = resnet_fpn_backbone('resnet152', pretrained=True, trainable_layers=5)
-    elif args.resnet101:
-        print("Using ResNet-101 as backbone")
-        backbone = resnet_fpn_backbone('resnet101', pretrained=True, trainable_layers=5)
-    else:
-        print("Using default ResNet-50 as backbone")
-        weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
-        model = fasterrcnn_resnet50_fpn(weights=weights, 
-                                        rpn_anchor_generator=anchor_generator)
-        return model
-
     if args.resnet101 or args.resnet152:
-        # Modify the first layer to accept grayscale input
-        original_layer = backbone.body.conv1
-        backbone.body.conv1 = nn.Conv2d(1, original_layer.out_channels, 
-                                        kernel_size=original_layer.kernel_size, 
-                                        stride=original_layer.stride, 
-                                        padding=original_layer.padding, 
-                                        bias=original_layer.bias)
+        backbone_name = 'resnet101' if args.resnet101 else 'resnet152'
+        print(f"Using {backbone_name} as backbone")
+        backbone = resnet_fpn_backbone(backbone_name, pretrained=True, trainable_layers=5)
         
-        # Initialize the new layer with the average of the pretrained weights
-        backbone.body.conv1.weight.data = original_layer.weight.data.mean(dim=1, keepdim=True)
-
         # Create FPN with custom scales for larger input
         fpn = torchvision.ops.FeaturePyramidNetwork(
             in_channels_list=[256, 512, 1024, 2048],
@@ -250,11 +233,12 @@ def create_model(args, num_classes, anchor_generator):
         # Create Faster R-CNN model with custom backbone
         model = FasterRCNN(backbone_with_fpn, num_classes=num_classes, 
                            rpn_anchor_generator=anchor_generator)
-
-        # Adjust RPN parameters for larger images
-        model.rpn.pre_nms_top_n = lambda: 2000
-        model.rpn.post_nms_top_n = lambda: 1000
-
+    else:
+        print("Using default ResNet-50 as backbone")
+        weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
+        model = fasterrcnn_resnet50_fpn(weights=weights, 
+                                        rpn_anchor_generator=anchor_generator)
+    
     return model
 
 def main():
