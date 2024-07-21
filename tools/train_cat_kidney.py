@@ -244,6 +244,9 @@ def create_model(args, num_classes, anchor_generator):
             ('fpn', fpn)
         ]))
 
+        # Add out_channels attribute to the combined backbone
+        backbone_with_fpn.out_channels = 256
+
         # Create Faster R-CNN model with custom backbone
         model = FasterRCNN(backbone_with_fpn, num_classes=num_classes, 
                            rpn_anchor_generator=anchor_generator)
