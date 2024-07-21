@@ -28,6 +28,8 @@ import torchvision
 from torchvision.ops.feature_pyramid_network import LastLevelMaxPool
 import ast
 from torchvision.models import ResNet101_Weights, ResNet152_Weights
+import psutil
+import GPUtil
 
 # Initialize global variables
 use_wandb = False
@@ -356,46 +358,58 @@ def main():
         metric_logger, avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
         lr_scheduler.step()
         
-        # Evaluate on validation set
-        mAP = evaluate(model, val_loader, device)
-        
-        print(f"Epoch {epoch}: mAP = {mAP}, Avg Loss = {avg_loss}")
+        # Evaluate on validation set every 4 epochs
+        if epoch % 4 == 0:
+            mAP = evaluate(model, val_loader, device)
+            
+            print(f"Epoch {epoch}: mAP = {mAP}, Avg Loss = {avg_loss}")
 
-        if use_wandb:
-            wandb.log({
-                "epoch": epoch,
-                "mAP": mAP,
-                "avg_loss": avg_loss,
-                "learning_rate": optimizer.param_groups[0]["lr"]
-            })
+            if use_wandb:
+                # Get CPU usage
+                cpu_percent = psutil.cpu_percent()
+                
+                # Get memory usage
+                memory = psutil.virtual_memory()
+                memory_percent = memory.percent
+                
+                # Get GPU usage if available
+                gpu_percent = 0
+                gpu_memory_percent = 0
+                if torch.cuda.is_available():
+                    gpu = GPUtil.getGPUs()[0]
+                    gpu_percent = gpu.load * 100
+                    gpu_memory_percent = gpu.memoryUtil * 100
 
-        # Save the model only if it's the best so far
-        if mAP > best_mAP:
-            best_mAP = mAP
-            best_epoch = epoch
-            if not use_wandb:  # Only save checkpoints when not doing a sweep
-                torch.save({
-                    'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'mAP': mAP,
-                }, os.path.join(checkpoint_dir, 'best_model.pth'))
-            print(f"New best model saved with mAP: {best_mAP}")
-        else:
-            print(f"mAP did not improve. Best is still {best_mAP} from epoch {best_epoch}")
+                wandb.log({
+                    "epoch": epoch,
+                    "mAP": mAP,
+                    "avg_loss": avg_loss,
+                    "learning_rate": optimizer.param_groups[0]["lr"],
+                    "cpu_percent": cpu_percent,
+                    "memory_percent": memory_percent,
+                    "gpu_percent": gpu_percent,
+                    "gpu_memory_percent": gpu_memory_percent
+                })
 
-        # Optionally, you can still save a checkpoint every N epochs
-        if (epoch + 1) % 10 == 0:  # Save every 10 epochs, for example
-            if not use_wandb:  # Only save checkpoints when not doing a sweep
-                torch.save({
-                    'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'mAP': mAP,
-                }, os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pth'))
+            # Update best_mAP and best_epoch
+            if mAP > best_mAP:
+                best_mAP = mAP
+                best_epoch = epoch
+                print(f"New best mAP: {best_mAP}")
+            else:
+                print(f"mAP did not improve. Best is still {best_mAP} from epoch {best_epoch}")
+
+        # Save checkpoint every 10 epochs if not using wandb
+        if not use_wandb and (epoch + 1) % 10 == 0:
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'mAP': mAP,
+            }, os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pth'))
 
     print(f"Training complete. Best mAP: {best_mAP} at epoch {best_epoch}")
-    if not use_wandb:  # Only print this when not doing a sweep
+    if not use_wandb:
         print(f"Best model saved in: {checkpoint_dir}/best_model.pth")
 
     if use_wandb:
@@ -403,4 +417,10 @@ def main():
         wandb.finish()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        if use_wandb:
+            wandb.log({"error": str(e)})
+        print(f"An error occurred: {str(e)}")
+        raise
