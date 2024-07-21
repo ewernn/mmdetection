@@ -1,7 +1,6 @@
 program: tools/train_cat_kidney.py
 method: grid
 name: cat_kidney_detection_sweep
-allow_duplicates: false
 parameters:
   learning_rate:
     values: [1e-6, 5e-6, 1e-5]
