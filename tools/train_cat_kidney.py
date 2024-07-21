@@ -100,14 +100,14 @@ def get_transform(train):
     if train:
         transforms.extend([
             T.RandomAffine(
-                degrees=(-5, 5),
+                degrees=(-15, 15),  # Increased rotation range
                 translate=(0.05, 0.05),
                 scale=(0.95, 1.05),
                 fill=0
             ),
             T.RandomAutocontrast(p=0.5),
-            T.Lambda(lambda x: TF.adjust_brightness(x, brightness_factor=random.uniform(0.8, 1.2))),
-            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.8, 1.2))),
+            T.Lambda(lambda x: TF.adjust_brightness(x, brightness_factor=random.uniform(0.7, 1.3))),  # More aggressive brightness adjustment
+            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.7, 1.3))),  # More aggressive contrast adjustment
             T.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
             T.RandomAdjustSharpness(sharpness_factor=1.5, p=0.3),
         ])
@@ -213,9 +213,17 @@ def create_model(args, num_classes, anchor_generator):
     if args.resnet101 or args.resnet152:
         backbone_name = 'resnet101' if args.resnet101 else 'resnet152'
         print(f"Using {backbone_name} as backbone")
-        backbone = resnet_fpn_backbone(backbone_name, pretrained=True, trainable_layers=5)
         
-        # Create FPN with custom scales for larger input
+        # Use resnet101 or resnet152 without FPN
+        if backbone_name == 'resnet101':
+            backbone = torchvision.models.resnet101(pretrained=True)
+        else:
+            backbone = torchvision.models.resnet152(pretrained=True)
+        
+        # Remove the last two layers (avgpool and fc)
+        backbone = nn.Sequential(*list(backbone.children())[:-2])
+        
+        # Create custom FPN
         fpn = torchvision.ops.FeaturePyramidNetwork(
             in_channels_list=[256, 512, 1024, 2048],
             out_channels=256,
