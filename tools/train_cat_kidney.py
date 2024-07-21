@@ -14,10 +14,14 @@ import sys
 import math  # Add this import
 import argparse
 import random  # Add this import
-from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights
+from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2 as fasterrcnn_resnet50_fpn
+from torchvision.models.detection import FasterRCNN_ResNet50_FPN_V2_Weights as FasterRCNN_ResNet50_FPN_Weights
+from torchvision.models.detection import FasterRCNN
+from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.anchor_utils import AnchorGenerator
 from torch.cuda.amp import GradScaler, autocast	
+import torch.nn as nn
 
 # Initialize global variables
 use_wandb = False
@@ -197,12 +201,45 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
 
     return metric_logger
 
+def create_model(args, num_classes, anchor_generator):
+    if args.resnet152:
+        print("Using ResNet-152 as backbone")
+        backbone = resnet_fpn_backbone('resnet152', pretrained=True)
+    elif args.resnet101:
+        print("Using ResNet-101 as backbone")
+        backbone = resnet_fpn_backbone('resnet101', pretrained=True)
+    else:
+        print("Using default ResNet-50 as backbone")
+        weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
+        model = fasterrcnn_resnet50_fpn(weights=weights, 
+                                        rpn_anchor_generator=anchor_generator)
+        return model
+
+    if args.resnet101 or args.resnet152:
+        # Modify the first layer to accept grayscale input
+        original_layer = backbone.body.conv1
+        backbone.body.conv1 = nn.Conv2d(1, original_layer.out_channels, 
+                                        kernel_size=original_layer.kernel_size, 
+                                        stride=original_layer.stride, 
+                                        padding=original_layer.padding, 
+                                        bias=original_layer.bias)
+        
+        # Initialize the new layer with the average of the pretrained weights
+        backbone.body.conv1.weight.data = original_layer.weight.data.mean(dim=1, keepdim=True)
+
+        model = FasterRCNN(backbone, num_classes=num_classes, 
+                           rpn_anchor_generator=anchor_generator)
+
+    return model
+
 def main():
     global use_wandb, use_colab
     parser = argparse.ArgumentParser(description='Train Cat Kidney Detection Model')
     parser.add_argument('--wandb', action='store_true', help='Use Weights & Biases for logging')
     parser.add_argument('--colab', action='store_true', help='Use Google Colab data path')
     parser.add_argument('--only_10', action='store_true', help='Use only 10 samples for quick testing')
+    parser.add_argument('--resnet101', action='store_true', help='Use ResNet-101 as backbone')
+    parser.add_argument('--resnet152', action='store_true', help='Use ResNet-152 as backbone')
     args = parser.parse_args()
 
     use_wandb = args.wandb
@@ -225,7 +262,7 @@ def main():
 
     # Hyperparameters
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
-    num_epochs = 300  # Increased from 120 to 300
+    num_epochs = 30  # Increased from 120 to 300
     batch_size = 4
     learning_rate = 0.0001
     weight_decay = 0.0005  # Slightly increased from 0.0001
@@ -254,10 +291,8 @@ def main():
     )
 
     # Model
-    weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
-    model = fasterrcnn_resnet50_fpn(weights=weights, 
-                                    rpn_anchor_generator=anchor_generator)
-    
+    model = create_model(args, num_classes, anchor_generator)
+
     # Replace the classifier with a new one for your number of classes
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
