@@ -321,18 +321,18 @@ def main():
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
     # Modify other RPN and ROI parameters
-    model.rpn.nms_thresh = 0.7
-    model.rpn.fg_iou_thresh = 0.7
-    model.rpn.bg_iou_thresh = 0.3
-    model.roi_heads.batch_size_per_image = 128
-    model.roi_heads.positive_fraction = 0.5
-    model.roi_heads.score_thresh = 0.1
-    model.roi_heads.nms_thresh = 0.5
-    model.roi_heads.detections_per_img = 5
+    model.rpn.nms_thresh = 0.8  # Increased from 0.7
+    model.rpn.fg_iou_thresh = 0.7  # Keep as is
+    model.rpn.bg_iou_thresh = 0.3  # Keep as is
+    model.roi_heads.batch_size_per_image = 256  # Increased from 128
+    model.roi_heads.positive_fraction = 0.25  # Decreased from 0.5
+    model.roi_heads.score_thresh = 0.05  # Decreased from 0.1
+    model.roi_heads.nms_thresh = 0.3  # Decreased from 0.5
+    model.roi_heads.detections_per_img = 5  # Decreased from 10
 
     # Set pre_nms_top_n and post_nms_top_n
-    model.rpn.pre_nms_top_n = lambda: 2000  # Increased from 1000
-    model.rpn.post_nms_top_n = lambda: 1000  # Increased from 500
+    model.rpn.pre_nms_top_n = lambda: 3000  # Increased from 2000
+    model.rpn.post_nms_top_n = lambda: 1500  # Increased from 1000
     print("Model parameters modified.")
 
     print("Printing trainable status of layers:")
@@ -380,7 +380,7 @@ def main():
         lr_scheduler.step()
         
         # Evaluate on validation set every 4 epochs
-        if epoch % 4 == 0 and epoch != 0:
+        if epoch % 2 == 0 and epoch != 0:
             mAP = evaluate(model, val_loader, device)
             
             print(f"Epoch {epoch}: mAP = {mAP}, Avg Loss = {avg_loss}")
