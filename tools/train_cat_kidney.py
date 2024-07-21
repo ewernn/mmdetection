@@ -210,14 +210,9 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     return metric_logger
 
 def create_model(args, num_classes, anchor_generator):
-    if args.resnet101 or args.resnet152:
-        backbone_name = 'resnet101' if args.resnet101 else 'resnet152'
-        print(f"Using {backbone_name} as backbone")
-        
-        # Use resnet_fpn_backbone function
-        backbone = resnet_fpn_backbone(backbone_name, pretrained=True, trainable_layers=5)
-        
-        # Create Faster R-CNN model with the backbone
+    if args.backbone in ['resnet101', 'resnet152']:
+        print(f"Using {args.backbone} as backbone")
+        backbone = resnet_fpn_backbone(args.backbone, pretrained=True, trainable_layers=5)
         model = FasterRCNN(backbone, num_classes=num_classes, 
                            rpn_anchor_generator=anchor_generator)
     else:
@@ -234,10 +229,10 @@ def main():
     parser.add_argument('--wandb', action='store_true', help='Use Weights & Biases for logging')
     parser.add_argument('--colab', action='store_true', help='Use Google Colab data path')
     parser.add_argument('--only_10', action='store_true', help='Use only 10 samples for quick testing')
-    parser.add_argument('--resnet101', action='store_true', help='Use ResNet-101 as backbone')
-    parser.add_argument('--resnet152', action='store_true', help='Use ResNet-152 as backbone')
     parser.add_argument('--anchor_sizes', type=str, default="((32,), (64,), (128,), (256,), (512,))")
     parser.add_argument('--aspect_ratios', type=str, default="((0.5, 1.0, 2.0),)")
+    parser.add_argument('--backbone', type=str, default='resnet50', choices=['resnet50', 'resnet101', 'resnet152'],
+                        help='Backbone architecture to use')
     args = parser.parse_args()
 
     use_wandb = args.wandb
@@ -245,7 +240,7 @@ def main():
     only_10 = args.only_10
 
     if use_wandb:
-        wandb.init(project="cat_kidney_detection")
+        wandb.init(project="cat_kidney_detection", config=args)
 
     # Paths
     if use_colab:
