@@ -354,7 +354,7 @@ def main():
     print("Creating optimizer and scheduler...")
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.0005)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
     print("Optimizer and scheduler created.")
 
     # Create a directory for checkpoints
@@ -380,7 +380,7 @@ def main():
         lr_scheduler.step()
         
         # Evaluate on validation set every 4 epochs
-        if epoch % 4 == 0:
+        if epoch % 4 == 0 and epoch != 0:
             mAP = evaluate(model, val_loader, device)
             
             print(f"Epoch {epoch}: mAP = {mAP}, Avg Loss = {avg_loss}")
