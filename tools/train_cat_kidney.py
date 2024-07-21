@@ -27,6 +27,7 @@ from collections import OrderedDict
 import torchvision
 from torchvision.ops.feature_pyramid_network import LastLevelMaxPool
 import ast
+from torchvision.models import ResNet101_Weights, ResNet152_Weights
 
 # Initialize global variables
 use_wandb = False
@@ -212,7 +213,8 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
 def create_model(args, num_classes, anchor_generator):
     if args.backbone in ['resnet101', 'resnet152']:
         print(f"Using {args.backbone} as backbone")
-        backbone = resnet_fpn_backbone(args.backbone, pretrained=True, trainable_layers=5)
+        weights = ResNet101_Weights.IMAGENET1K_V1 if args.backbone == 'resnet101' else ResNet152_Weights.IMAGENET1K_V1
+        backbone = resnet_fpn_backbone(backbone_name=args.backbone, weights=weights, trainable_layers=5)
         model = FasterRCNN(backbone, num_classes=num_classes, 
                            rpn_anchor_generator=anchor_generator)
     else:
