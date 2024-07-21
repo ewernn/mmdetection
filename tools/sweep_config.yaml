@@ -1,6 +1,6 @@
 program: tools/train_cat_kidney.py
 method: grid
-name: feline_kidney_detection_sweep
+name: feline_kidney_detection_sweep_v1
 command:
   - ${env}
   - python
