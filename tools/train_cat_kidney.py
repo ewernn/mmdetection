@@ -239,6 +239,7 @@ def main():
     parser.add_argument('--backbone', type=str, default='resnet50', choices=['resnet50', 'resnet101', 'resnet152'],
                         help='Backbone architecture to use')
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
+    parser.add_argument('--learning_rate', type=float, default=0.0001, help='Learning rate for training')
     args = parser.parse_args()
 
     use_wandb = args.wandb
@@ -263,7 +264,7 @@ def main():
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
     num_epochs = 20  # Increased from 120 to 300
     batch_size = args.batch_size  # Use the batch size from args
-    learning_rate = 0.0001
+    learning_rate = args.learning_rate  # Use the learning rate from command-line arguments
     weight_decay = 0.0005  # Slightly increased from 0.0001
     momentum = 0.9
 
@@ -334,7 +335,7 @@ def main():
 
     print("Creating optimizer and scheduler...")
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=1e-5, momentum=0.9, weight_decay=0.0005)
+    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.0005)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
     print("Optimizer and scheduler created.")
 
