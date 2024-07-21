@@ -235,6 +235,7 @@ def main():
     parser.add_argument('--aspect_ratios', type=str, default="((0.5, 1.0, 2.0),)")
     parser.add_argument('--backbone', type=str, default='resnet50', choices=['resnet50', 'resnet101', 'resnet152'],
                         help='Backbone architecture to use')
+    parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
     args = parser.parse_args()
 
     use_wandb = args.wandb
@@ -257,43 +258,43 @@ def main():
 
     # Hyperparameters
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
-    num_epochs = 30  # Increased from 120 to 300
-    batch_size = 2
+    num_epochs = 20  # Increased from 120 to 300
+    batch_size = args.batch_size  # Use the batch size from args
     learning_rate = 0.0001
     weight_decay = 0.0005  # Slightly increased from 0.0001
     momentum = 0.9
 
     if use_wandb:
         learning_rate = wandb.config.learning_rate  # Use wandb config for learning rate
+        batch_size = wandb.config.batch_size  # Use wandb config for batch size
 
-    # Dataset and DataLoader
+    print("Initializing datasets...")
     train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=True, only_10=only_10)
     val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=True, only_10=only_10)
+    print("Datasets initialized.")
 
     # Adjust num_epochs if only_10 is True
     if only_10:
         num_epochs = min(num_epochs, 10)  # Limit to 10 epochs for quick testing
-
+    print("Creating data loaders...")
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, collate_fn=collate_fn)
+    print("Data loaders created.")
 
-    # Parse anchor sizes and aspect ratios
+    print("Parsing anchor sizes and aspect ratios...")
     anchor_sizes = ast.literal_eval(args.anchor_sizes)
     aspect_ratios = ast.literal_eval(args.aspect_ratios)
     
     # Repeat aspect ratios for each anchor size
     aspect_ratios = aspect_ratios * len(anchor_sizes)
+    anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
+    print("Anchor generator created.")
 
-    # Create anchor generator
-    anchor_generator = AnchorGenerator(
-        sizes=anchor_sizes,
-        aspect_ratios=aspect_ratios
-    )
-
-    # Model
+    print("Creating model...")
     model = create_model(args, num_classes, anchor_generator)
+    print("Model created.")
 
-    # Replace the classifier with a new one for your number of classes
+    print("Modifying model parameters...")
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
@@ -307,14 +308,12 @@ def main():
     model.roi_heads.nms_thresh = 0.5
     model.roi_heads.detections_per_img = 5
 
-    # Set pre_nms_top_n and post_nms_top_n correctly
+    # Set pre_nms_top_n and post_nms_top_n
     model.rpn.pre_nms_top_n = lambda: 2000  # Increased from 1000
     model.rpn.post_nms_top_n = lambda: 1000  # Increased from 500
+    print("Model parameters modified.")
 
-    # All layers are unfrozen by default, so no need to explicitly unfreeze
-
-    # Print the trainable status of layers
-    print("\nTrainable status of layers:")
+    print("Printing trainable status of layers:")
     for name, param in model.named_parameters():
         if 'backbone' in name:
             print(f"{name}: {param.requires_grad}")
@@ -325,14 +324,16 @@ def main():
         device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
     
     print(f"Using device: {device}")
-    model.to(device)
 
-    # Optimizer with lower learning rate
+    print("Moving model to device...")
+    model.to(device)
+    print("Model moved to device.")
+
+    print("Creating optimizer and scheduler...")
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=1e-5, momentum=0.9, weight_decay=0.0005)
-
-    # Learning rate scheduler
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+    print("Optimizer and scheduler created.")
 
     # Create a directory for checkpoints
     os.makedirs(checkpoint_dir, exist_ok=True)
