@@ -3,7 +3,7 @@ method: grid
 name: cat_kidney_detection_sweep
 parameters:
   learning_rate:
-    values: [1e-6, 5e-6, 1e-5]
+    values: [1e-4, 1e-5]
   anchor_sizes:
     values:
       - "((32,), (64,), (128,), (256,), (512,))"
