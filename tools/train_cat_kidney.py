@@ -105,8 +105,8 @@ def get_transform(train):
                 fill=0
             ),
             T.RandomAutocontrast(p=0.5),
-            T.Lambda(lambda x: TF.adjust_brightness(x, brightness_factor=random.uniform(0.8, 1.2))),
-            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.8, 1.2))),
+            T.Lambda(lambda x: T.adjust_brightness(x, brightness_factor=random.uniform(0.8, 1.2))),
+            T.Lambda(lambda x: T.adjust_contrast(x, contrast_factor=random.uniform(0.8, 1.2))),
             T.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
             T.RandomAdjustSharpness(sharpness_factor=1.5, p=0.3),
         ])
