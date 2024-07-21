@@ -214,33 +214,11 @@ def create_model(args, num_classes, anchor_generator):
         backbone_name = 'resnet101' if args.resnet101 else 'resnet152'
         print(f"Using {backbone_name} as backbone")
         
-        # Use resnet101 or resnet152 without FPN
-        if backbone_name == 'resnet101':
-            backbone = torchvision.models.resnet101(pretrained=True)
-        else:
-            backbone = torchvision.models.resnet152(pretrained=True)
+        # Use resnet_fpn_backbone function
+        backbone = resnet_fpn_backbone(backbone_name, pretrained=True, trainable_layers=5)
         
-        # Remove the last two layers (avgpool and fc)
-        backbone = nn.Sequential(*list(backbone.children())[:-2])
-        
-        # Create custom FPN
-        fpn = torchvision.ops.FeaturePyramidNetwork(
-            in_channels_list=[256, 512, 1024, 2048],
-            out_channels=256,
-            extra_blocks=LastLevelMaxPool(),
-        )
-
-        # Combine backbone with FPN
-        backbone_with_fpn = nn.Sequential(OrderedDict([
-            ('backbone', backbone),
-            ('fpn', fpn)
-        ]))
-
-        # Add out_channels attribute to the combined backbone
-        backbone_with_fpn.out_channels = 256
-
-        # Create Faster R-CNN model with custom backbone
-        model = FasterRCNN(backbone_with_fpn, num_classes=num_classes, 
+        # Create Faster R-CNN model with the backbone
+        model = FasterRCNN(backbone, num_classes=num_classes, 
                            rpn_anchor_generator=anchor_generator)
     else:
         print("Using default ResNet-50 as backbone")
