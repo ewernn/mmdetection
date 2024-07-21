@@ -3,3 +3,11 @@ method: grid
 parameters:
   learning_rate:
     values: [1e-6, 5e-6, 1e-5]
+  anchor_sizes:
+    values:
+      - "((32,), (64,), (128,), (256,), (512,))"
+      - "((64,), (96,), (128,), (192,), (256,))"
+  aspect_ratios:
+    values:
+      - "((0.5, 1.0, 2.0),)"
+      - "((0.7, 1.0, 1.3),)"

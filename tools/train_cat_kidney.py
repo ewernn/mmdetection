@@ -22,6 +22,10 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.anchor_utils import AnchorGenerator
 from torch.cuda.amp import GradScaler, autocast	
 import torch.nn as nn
+from collections import OrderedDict
+import torchvision
+from torchvision.ops.feature_pyramid_network import LastLevelMaxPool
+import ast
 
 # Initialize global variables
 use_wandb = False
@@ -204,10 +208,10 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
 def create_model(args, num_classes, anchor_generator):
     if args.resnet152:
         print("Using ResNet-152 as backbone")
-        backbone = resnet_fpn_backbone('resnet152', pretrained=True)
+        backbone = resnet_fpn_backbone('resnet152', pretrained=True, trainable_layers=5)
     elif args.resnet101:
         print("Using ResNet-101 as backbone")
-        backbone = resnet_fpn_backbone('resnet101', pretrained=True)
+        backbone = resnet_fpn_backbone('resnet101', pretrained=True, trainable_layers=5)
     else:
         print("Using default ResNet-50 as backbone")
         weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
@@ -227,8 +231,26 @@ def create_model(args, num_classes, anchor_generator):
         # Initialize the new layer with the average of the pretrained weights
         backbone.body.conv1.weight.data = original_layer.weight.data.mean(dim=1, keepdim=True)
 
-        model = FasterRCNN(backbone, num_classes=num_classes, 
+        # Create FPN with custom scales for larger input
+        fpn = torchvision.ops.FeaturePyramidNetwork(
+            in_channels_list=[256, 512, 1024, 2048],
+            out_channels=256,
+            extra_blocks=LastLevelMaxPool(),
+        )
+
+        # Combine backbone with FPN
+        backbone_with_fpn = nn.Sequential(OrderedDict([
+            ('backbone', backbone),
+            ('fpn', fpn)
+        ]))
+
+        # Create Faster R-CNN model with custom backbone
+        model = FasterRCNN(backbone_with_fpn, num_classes=num_classes, 
                            rpn_anchor_generator=anchor_generator)
+
+        # Adjust RPN parameters for larger images
+        model.rpn.pre_nms_top_n = lambda: 2000
+        model.rpn.post_nms_top_n = lambda: 1000
 
     return model
 
@@ -240,6 +262,8 @@ def main():
     parser.add_argument('--only_10', action='store_true', help='Use only 10 samples for quick testing')
     parser.add_argument('--resnet101', action='store_true', help='Use ResNet-101 as backbone')
     parser.add_argument('--resnet152', action='store_true', help='Use ResNet-152 as backbone')
+    parser.add_argument('--anchor_sizes', type=str, default="((32,), (64,), (128,), (256,), (512,))")
+    parser.add_argument('--aspect_ratios', type=str, default="((0.5, 1.0, 2.0),)")
     args = parser.parse_args()
 
     use_wandb = args.wandb
@@ -263,7 +287,7 @@ def main():
     # Hyperparameters
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
     num_epochs = 30  # Increased from 120 to 300
-    batch_size = 4
+    batch_size = 2
     learning_rate = 0.0001
     weight_decay = 0.0005  # Slightly increased from 0.0001
     momentum = 0.9
@@ -282,9 +306,14 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, collate_fn=collate_fn)
 
-    # Define custom anchor generator
-    anchor_sizes = ((32,), (64,), (128,), (256,), (512,))  # 5 feature map levels
-    aspect_ratios = ((1.0, 1.2, 1.5),) * len(anchor_sizes)
+    # Parse anchor sizes and aspect ratios
+    anchor_sizes = ast.literal_eval(args.anchor_sizes)
+    aspect_ratios = ast.literal_eval(args.aspect_ratios)
+    
+    # Repeat aspect ratios for each anchor size
+    aspect_ratios = aspect_ratios * len(anchor_sizes)
+
+    # Create anchor generator
     anchor_generator = AnchorGenerator(
         sizes=anchor_sizes,
         aspect_ratios=aspect_ratios
@@ -308,8 +337,8 @@ def main():
     model.roi_heads.detections_per_img = 5
 
     # Set pre_nms_top_n and post_nms_top_n correctly
-    model.rpn.pre_nms_top_n = lambda: 200  # for both training and testing
-    model.rpn.post_nms_top_n = lambda: 100  # for both training and testing
+    model.rpn.pre_nms_top_n = lambda: 2000  # Increased from 1000
+    model.rpn.post_nms_top_n = lambda: 1000  # Increased from 500
 
     # All layers are unfrozen by default, so no need to explicitly unfreeze
 
@@ -338,35 +367,49 @@ def main():
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     best_mAP = 0.0
+    best_epoch = -1
+
+    if use_wandb:
+        wandb.config.update({
+            "anchor_sizes": args.anchor_sizes,
+            "aspect_ratios": args.aspect_ratios
+        })
 
     # Training loop
     for epoch in range(num_epochs):
-        train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)  # Updated print_freq
+        train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
         lr_scheduler.step()
         
         # Evaluate on validation set
         mAP = evaluate(model, val_loader, device)
         
-        # Save the best model
+        print(f"Epoch {epoch}: mAP = {mAP}")
+
+        # Save the model only if it's the best so far
         if mAP > best_mAP:
             best_mAP = mAP
+            best_epoch = epoch
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'mAP': mAP,
             }, os.path.join(checkpoint_dir, 'best_model.pth'))
-        
-        # Save regular checkpoint
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'mAP': mAP,
-        }, os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pth'))
+            print(f"New best model saved with mAP: {best_mAP}")
+        else:
+            print(f"mAP did not improve. Best is still {best_mAP} from epoch {best_epoch}")
 
-    print(f"Training complete. Best mAP: {best_mAP}")
-    print(f"Checkpoints saved in: {checkpoint_dir}")
+        # Optionally, you can still save a checkpoint every N epochs
+        if (epoch + 1) % 10 == 0:  # Save every 10 epochs, for example
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'mAP': mAP,
+            }, os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pth'))
+
+    print(f"Training complete. Best mAP: {best_mAP} at epoch {best_epoch}")
+    print(f"Best model saved in: {checkpoint_dir}/best_model.pth")
 
 if __name__ == "__main__":
     main()
