@@ -135,13 +135,31 @@ def evaluate(model, data_loader, device):
             boxes = output["boxes"].detach().cpu().numpy()
             scores = output["scores"].detach().cpu().numpy()
             labels = output["labels"].detach().cpu().numpy()
+            
+            # Add debug print statements
+            print(f"Image ID: {image_id}")
+            print(f"Number of detections: {len(boxes)}")
+            print(f"Scores: {scores}")
+            
             for box, score, label in zip(boxes, scores, labels):
+                # Check for invalid boxes
+                if any(coord < 0 for coord in box) or box[2] <= box[0] or box[3] <= box[1]:
+                    print(f"Invalid box detected: {box}")
+                    continue
+                
                 coco_results.append({
                     "image_id": image_id,
                     "category_id": label,
                     "bbox": box.tolist(),
                     "score": score,
                 })
+    
+    print(f"Total number of results: {len(coco_results)}")
+    
+    if len(coco_results) == 0:
+        print("No valid detections found. Returning 0 mAP.")
+        return 0.0
+    
     coco_dt = coco.loadRes(coco_results)
     coco_eval = COCOeval(coco, coco_dt, "bbox")
     coco_eval.evaluate()
@@ -353,6 +371,8 @@ def main():
             "anchor_sizes": args.anchor_sizes,
             "aspect_ratios": args.aspect_ratios
         })
+
+    print(f"Validation dataset size: {len(val_dataset)}")
 
     # Training loop
     for epoch in range(num_epochs):
