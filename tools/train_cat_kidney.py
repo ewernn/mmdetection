@@ -127,6 +127,10 @@ def evaluate(model, data_loader, device):
     model.eval()
     coco = data_loader.dataset.coco
     coco_results = []
+
+    print(f"Number of images in evaluation dataset: {len(data_loader.dataset)}")
+    print(f"Number of categories: {len(coco.cats)}")
+
     for images, targets in data_loader:
         images = list(img.to(device) for img in images)
         outputs = model(images)
@@ -136,22 +140,27 @@ def evaluate(model, data_loader, device):
             scores = output["scores"].detach().cpu().numpy()
             labels = output["labels"].detach().cpu().numpy()
             
-            # Add debug print statements
             print(f"Image ID: {image_id}")
             print(f"Number of detections: {len(boxes)}")
             print(f"Scores: {scores}")
+            print(f"Labels: {labels}")
+            
+            # Print ground truth for comparison
+            gt_boxes = target["boxes"].cpu().numpy()
+            gt_labels = target["labels"].cpu().numpy()
+            print(f"Ground Truth - Number of objects: {len(gt_boxes)}")
+            print(f"Ground Truth - Labels: {gt_labels}")
             
             for box, score, label in zip(boxes, scores, labels):
-                # Check for invalid boxes
                 if any(coord < 0 for coord in box) or box[2] <= box[0] or box[3] <= box[1]:
                     print(f"Invalid box detected: {box}")
                     continue
                 
                 coco_results.append({
                     "image_id": image_id,
-                    "category_id": label,
-                    "bbox": box.tolist(),
-                    "score": score,
+                    "category_id": label.item(),
+                    "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]],  # Convert to COCO format
+                    "score": score.item(),
                 })
     
     print(f"Total number of results: {len(coco_results)}")
@@ -160,11 +169,21 @@ def evaluate(model, data_loader, device):
         print("No valid detections found. Returning 0 mAP.")
         return 0.0
     
+    # Print a sample result
+    print("Sample detection result:")
+    print(json.dumps(coco_results[0], indent=2))
+    
     coco_dt = coco.loadRes(coco_results)
     coco_eval = COCOeval(coco, coco_dt, "bbox")
     coco_eval.evaluate()
     coco_eval.accumulate()
     coco_eval.summarize()
+
+    # Print more detailed evaluation metrics
+    print(f"AP @ IoU=0.50:0.95: {coco_eval.stats[0]}")
+    print(f"AP @ IoU=0.50: {coco_eval.stats[1]}")
+    print(f"AP @ IoU=0.75: {coco_eval.stats[2]}")
+
     return coco_eval.stats[0]  # mAP
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
