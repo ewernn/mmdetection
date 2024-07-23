@@ -117,8 +117,9 @@ def create_coco_format_subset(df, images_dir, output_json_path, subset_name):
     print(f"Total annotations: {len(annotations)}")
 
 # Usage
-data_csv_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Data.csv'  # Update with your actual path
+#data_csv_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Data.csv'  # Update with your actual path
+data_csv_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Updated_Data_only2.csv'  # Update with your actual path
 images_dir = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset'               # Update with your actual path to images directory
-output_json_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-high_quality'  # Update with your desired output path
+output_json_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-high_quality2'  # Update with your desired output path
 
 create_coco_format(data_csv_path, images_dir, output_json_path)

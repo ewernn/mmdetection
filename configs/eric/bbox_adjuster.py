@@ -174,13 +174,13 @@ def adjust_bboxes(csv_path, images_dir, start_index=0):
     return df, idx
 
 # Usage
-csv_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Data.csv'
+csv_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Data_only2.csv'
 images_dir = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset'
 
 while True:
     start_index = 0  # Always start from the beginning
     updated_df, last_index = adjust_bboxes(csv_path, images_dir, start_index)
-    updated_df.to_csv('/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Updated_Data.csv', index=False)
+    updated_df.to_csv('/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Updated_Data_only2.csv', index=False)
     
     print(f"Last processed image index: {last_index}")
     print("Program finished. You can run it again to start from the beginning.")
