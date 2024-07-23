@@ -36,6 +36,10 @@ import matplotlib.patches as patches
 from torchvision.utils import draw_bounding_boxes
 from torchvision.io import read_image
 from torchvision.transforms.functional import to_pil_image
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.nn.utils import clip_grad_norm_
+
+
 
 # Initialize global variables
 use_wandb = False
@@ -311,11 +315,12 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
 
-    lr_scheduler = None
-    if epoch == 0:
-        warmup_factor = 1. / 1000
-        warmup_iters = min(1000, len(data_loader) - 1)
-        lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
+    # lr_scheduler = None
+    # if epoch == 0:
+    #     warmup_factor = 1. / 1000
+    #     warmup_iters = min(1000, len(data_loader) - 1)
+    #     lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
+
 
     use_amp = device.type == 'cuda'
     scaler = GradScaler() if use_amp else None
@@ -338,6 +343,12 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
         loss_dict_reduced = utils.reduce_dict(loss_dict)
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
+        # Print individual loss components
+        for loss_name, loss_value in loss_dict_reduced.items():
+            print(f"{loss_name}: {loss_value}")
+
+        print(f"Total loss: {losses_reduced}")
+
         loss_value = losses_reduced.item()
         total_loss += loss_value
         num_batches += 1
@@ -346,6 +357,8 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
             print("Loss is {}, stopping training".format(loss_value))
             print(loss_dict_reduced)
             sys.exit(1)
+
+        clip_grad_norm_(model.parameters(), max_norm=1.0)
 
         optimizer.zero_grad()
         if use_amp:
@@ -356,8 +369,8 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
             losses.backward()
             optimizer.step()
 
-        if lr_scheduler is not None:
-            lr_scheduler.step()
+        # if lr_scheduler is not None:
+        #     lr_scheduler.step()
 
         metric_logger.update(loss=losses_reduced)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
@@ -422,8 +435,6 @@ def main():
     num_epochs = 300  # Set to 300 epochs
     batch_size = args.batch_size
     learning_rate = args.learning_rate
-    weight_decay = 0.0005
-    momentum = 0.9
 
     if use_wandb and not args.no_sweep:
         learning_rate = wandb.config.learning_rate
@@ -494,10 +505,11 @@ def main():
 
     print("Creating optimizer and scheduler...")
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.0005)
+    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.005)
 
-    # Modified learning rate scheduler
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.8)
+    # # Modified learning rate scheduler
+    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.8)
+    lr_scheduler = CosineAnnealingLR(optimizer, T_max=300, eta_min=1e-6)
 
     # Add a learning rate minimum
     min_lr = 1e-6
