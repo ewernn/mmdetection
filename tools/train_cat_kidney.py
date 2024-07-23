@@ -264,7 +264,7 @@ def evaluate(model, data_loader, device, epoch):
     coco_eval.evaluate()
     coco_eval.accumulate()
     coco_eval.summarize()
-    
+
     # Print more detailed evaluation metrics
     print(f"AP @ IoU=0.50:0.95: {coco_eval.stats[0]}")
     print(f"AP @ IoU=0.50: {coco_eval.stats[1]}")
@@ -300,7 +300,7 @@ def evaluate(model, data_loader, device, epoch):
     if use_wandb:
         wandb.log(metrics)
 
-    return metrics["mAP"]  # Still return mAP for compatibility
+    return metrics
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     model.train()
@@ -514,9 +514,10 @@ def main():
         metric_logger, avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
         lr_scheduler.step()
         
-        # Evaluate on validation set every 4 epochs
+        # Evaluate on validation set every 2 epochs
         if epoch % 2 == 0 and epoch != 0:
-            mAP = evaluate(model, val_loader, device, epoch)
+            metrics = evaluate(model, val_loader, device, epoch)
+            mAP = metrics["mAP"]
             
             print(f"Epoch {epoch}: mAP = {mAP}, Avg Loss = {avg_loss}")
 
@@ -538,14 +539,13 @@ def main():
 
                 wandb.log({
                     "epoch": epoch,
-                    "mAP": mAP,
                     "avg_loss": avg_loss,
                     "learning_rate": optimizer.param_groups[0]["lr"],
                     "cpu_percent": cpu_percent,
                     "memory_percent": memory_percent,
                     "gpu_percent": gpu_percent,
                     "gpu_memory_percent": gpu_memory_percent,
-                    **metrics  # all metrics from evaluate function
+                    **metrics  # This will include all the metrics from the evaluate function
                 })
 
             # Update best_mAP and best_epoch
