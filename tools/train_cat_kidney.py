@@ -30,6 +30,7 @@ import ast
 from torchvision.models import ResNet101_Weights, ResNet152_Weights
 import psutil
 import GPUtil
+import numpy as np
 
 # Initialize global variables
 use_wandb = False
@@ -128,11 +129,18 @@ def evaluate(model, data_loader, device):
     coco = data_loader.dataset.coco
     coco_results = []
 
-    print(f"Number of images in evaluation dataset: {len(data_loader.dataset)}")
-    print(f"Number of categories: {len(coco.cats)}")
-
     for images, targets in data_loader:
         images = list(img.to(device) for img in images)
+        
+        # Add this block to print model outputs
+        with torch.no_grad():
+            outputs = model(images)
+            print("Raw model outputs:")
+            for i, output in enumerate(outputs):
+                print(f"Image {i}:")
+                print(f"  Boxes: {output['boxes']}")
+                print(f"  Labels: {output['labels']}")
+                print(f"  Scores: {output['scores']}")
         outputs = model(images)
         for target, output in zip(targets, outputs):
             image_id = target["image_id"].item()
@@ -140,10 +148,35 @@ def evaluate(model, data_loader, device):
             scores = output["scores"].detach().cpu().numpy()
             labels = output["labels"].detach().cpu().numpy()
             
+            # Apply NMS
+            keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.5)
+            boxes = boxes[keep]
+            scores = scores[keep]
+            labels = labels[keep]
+            
+            # Select top prediction for each class
+            results = {}
+            for label in np.unique(labels):
+                class_mask = labels == label
+                if np.any(class_mask):
+                    top_idx = np.argmax(scores[class_mask])
+                    results[label] = {
+                        "box": boxes[class_mask][top_idx],
+                        "score": scores[class_mask][top_idx]
+                    }
+            
+            for label, result in results.items():
+                coco_results.append({
+                    "image_id": image_id,
+                    "category_id": int(label),
+                    "bbox": result["box"].tolist(),
+                    "score": float(result["score"])
+                })
+
             print(f"Image ID: {image_id}")
-            print(f"Number of detections: {len(boxes)}")
-            print(f"Scores: {scores}")
-            print(f"Labels: {labels}")
+            print(f"Number of detections after filtering: {len(results)}")
+            print(f"Scores: {[result['score'] for result in results.values()]}")
+            print(f"Labels: {list(results.keys())}")
             
             # Print ground truth for comparison
             gt_boxes = target["boxes"].cpu().numpy()
