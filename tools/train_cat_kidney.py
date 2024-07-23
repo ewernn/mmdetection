@@ -492,7 +492,13 @@ def main():
     print("Creating optimizer and scheduler...")
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.0005)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
+
+    # Modified learning rate scheduler
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.7)
+
+    # Add a learning rate minimum
+    min_lr = 1e-6
+
     print("Optimizer and scheduler created.")
 
     # Create a directory for checkpoints
@@ -515,14 +521,18 @@ def main():
     # Training loop
     for epoch in range(num_epochs):
         metric_logger, avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
-        lr_scheduler.step()
         
-        # Evaluate on validation set every 2 epochs
-        if epoch % 2 == 0 and epoch != 0:
+        # Apply learning rate scheduler with minimum lr
+        lr_scheduler.step()
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = max(param_group['lr'], min_lr)
+        
+        # Evaluate on validation set every 5 epochs
+        if (epoch + 1) % 5 == 0:
             metrics = evaluate(model, val_loader, device, epoch)
             mAP = metrics["mAP"]
             
-            print(f"Epoch {epoch}: mAP = {mAP}, Avg Loss = {avg_loss}")
+            print(f"Epoch {epoch + 1}: mAP = {mAP}, Avg Loss = {avg_loss}")
 
             if use_wandb:
                 # Get CPU usage
@@ -541,7 +551,7 @@ def main():
                     gpu_memory_percent = gpu.memoryUtil * 100
 
                 wandb.log({
-                    "epoch": epoch,
+                    "epoch": epoch + 1,
                     "avg_loss": avg_loss,
                     "learning_rate": optimizer.param_groups[0]["lr"],
                     "cpu_percent": cpu_percent,
@@ -551,26 +561,25 @@ def main():
                     **metrics  # This will include all the metrics from the evaluate function
                 })
 
-            # Update best_mAP and best_epoch
+            # Update best_mAP and best_epoch, and save model if it's the best so far
             if mAP > best_mAP:
                 best_mAP = mAP
-                best_epoch = epoch
+                best_epoch = epoch + 1
                 print(f"New best mAP: {best_mAP}")
+                
+                # Save the best model
+                torch.save({
+                    'epoch': epoch + 1,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'mAP': mAP,
+                }, os.path.join(checkpoint_dir, 'best_model.pth'))
+                
+                print(f"New best model saved in: {checkpoint_dir}/best_model.pth")
             else:
                 print(f"mAP did not improve. Best is still {best_mAP} from epoch {best_epoch}")
 
-        # Save checkpoint every 10 epochs if not using wandb
-        if not use_wandb and (epoch + 1) % 10 == 0:
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'mAP': mAP,
-            }, os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pth'))
-
     print(f"Training complete. Best mAP: {best_mAP} at epoch {best_epoch}")
-    if not use_wandb:
-        print(f"Best model saved in: {checkpoint_dir}/best_model.pth")
 
     if use_wandb:
         wandb.log({"best_mAP": best_mAP, "best_epoch": best_epoch})
