@@ -116,8 +116,8 @@ def get_transform(train):
             ),
             T.RandomAutocontrast(p=0.5),
             T.Lambda(lambda x: TF.adjust_brightness(x, brightness_factor=random.uniform(0.7, 1.3))),  # More aggressive brightness adjustment
-            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.7, 1.3))),  # More aggressive contrast adjustment
-            T.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
+            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.6, 1.4))),  # More aggressive contrast adjustment
+            T.GaussianBlur(kernel_size=3, sigma=(0.0, 0.4)),
             T.RandomAdjustSharpness(sharpness_factor=1.5, p=0.3),
         ])
     
@@ -189,7 +189,7 @@ def evaluate(model, data_loader, device, epoch):
             labels = output["labels"].detach().cpu().numpy()
             
             # Apply NMS
-            keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.5)
+            keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.7)
             boxes = boxes[keep]
             scores = scores[keep]
             labels = labels[keep]
@@ -392,7 +392,7 @@ def main():
     parser.add_argument('--backbone', type=str, default='resnet152', choices=['resnet50', 'resnet101', 'resnet152'],
                         help='Backbone architecture to use')
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
-    parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate for training')
+    parser.add_argument('--learning_rate', type=float, default=2e-4, help='Learning rate for training')
     parser.add_argument('--no_sweep', action='store_true', help='Disable wandb sweep and use specified hyperparameters')
     args = parser.parse_args()
 
@@ -459,14 +459,16 @@ def main():
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
     # Modify other RPN and ROI parameters
-    model.rpn.nms_thresh = 0.8  # Increased from 0.7
+    model.rpn.nms_thresh = 0.9  # Increased from 0.7
     model.rpn.fg_iou_thresh = 0.7  # Keep as is
     model.rpn.bg_iou_thresh = 0.3  # Keep as is
     model.roi_heads.batch_size_per_image = 256  # Increased from 128
-    model.roi_heads.positive_fraction = 0.25  # Decreased from 0.5
-    model.roi_heads.score_thresh = 0.05  # Decreased from 0.1
-    model.roi_heads.nms_thresh = 0.3  # Decreased from 0.5
-    model.roi_heads.detections_per_img = 5  # Decreased from 10
+    #model.roi_heads.positive_fraction = 0.25  # Decreased from 0.5
+    model.roi_heads.positive_fraction = 0.5  # increased back to 0.5
+    model.roi_heads.score_thresh = 0.2  # Decreased from 0.1
+    #model.roi_heads.score_thresh = 0.05  # Decreased from 0.1
+    model.roi_heads.nms_thresh = 0.5  # Decreased from 0.5
+    model.roi_heads.detections_per_img = 10  # Decreased from 10
 
     # Set pre_nms_top_n and post_nms_top_n
     model.rpn.pre_nms_top_n = lambda: 3000  # Increased from 2000
@@ -494,7 +496,7 @@ def main():
     optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.0005)
 
     # Modified learning rate scheduler
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.7)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.8)
 
     # Add a learning rate minimum
     min_lr = 1e-6
