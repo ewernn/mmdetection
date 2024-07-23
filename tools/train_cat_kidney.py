@@ -387,12 +387,13 @@ def main():
     parser.add_argument('--wandb', action='store_true', help='Use Weights & Biases for logging')
     parser.add_argument('--colab', action='store_true', help='Use Google Colab data path')
     parser.add_argument('--only_10', action='store_true', help='Use only 10 samples for quick testing')
-    parser.add_argument('--anchor_sizes', type=str, default="((32,), (64,), (128,), (256,), (512,))")
-    parser.add_argument('--aspect_ratios', type=str, default="((0.5, 1.0, 2.0),)")
-    parser.add_argument('--backbone', type=str, default='resnet50', choices=['resnet50', 'resnet101', 'resnet152'],
+    parser.add_argument('--anchor_sizes', type=str, default="((161,), (192,), (219,), (252,), (311,))")
+    parser.add_argument('--aspect_ratios', type=str, default="((1.5, 2.0, 2.5),)")
+    parser.add_argument('--backbone', type=str, default='resnet152', choices=['resnet50', 'resnet101', 'resnet152'],
                         help='Backbone architecture to use')
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
-    parser.add_argument('--learning_rate', type=float, default=0.0001, help='Learning rate for training')
+    parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate for training')
+    parser.add_argument('--no_sweep', action='store_true', help='Disable wandb sweep and use specified hyperparameters')
     args = parser.parse_args()
 
     use_wandb = args.wandb
@@ -415,15 +416,17 @@ def main():
 
     # Hyperparameters
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
-    num_epochs = 20  # Increased from 120 to 300
-    batch_size = args.batch_size  # Use the batch size from args
-    learning_rate = args.learning_rate  # Use the learning rate from command-line arguments
-    weight_decay = 0.0005  # Slightly increased from 0.0001
+    num_epochs = 300  # Set to 300 epochs
+    batch_size = args.batch_size
+    learning_rate = args.learning_rate
+    weight_decay = 0.0005
     momentum = 0.9
 
-    if use_wandb:
-        learning_rate = wandb.config.learning_rate  # Use wandb config for learning rate
-        batch_size = wandb.config.batch_size  # Use wandb config for batch size
+    if use_wandb and not args.no_sweep:
+        learning_rate = wandb.config.learning_rate
+        batch_size = wandb.config.batch_size
+        args.anchor_sizes = wandb.config.anchor_sizes
+        args.aspect_ratios = wandb.config.aspect_ratios
 
     print("Initializing datasets...")
     train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=True, only_10=only_10)
