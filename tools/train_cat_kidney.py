@@ -31,6 +31,11 @@ from torchvision.models import ResNet101_Weights, ResNet152_Weights
 import psutil
 import GPUtil
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from torchvision.utils import draw_bounding_boxes
+from torchvision.io import read_image
+from torchvision.transforms.functional import to_pil_image
 
 # Initialize global variables
 use_wandb = False
@@ -124,24 +129,59 @@ def get_transform(train):
 def collate_fn(batch):
     return tuple(zip(*batch))
 
-def evaluate(model, data_loader, device):
+def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_id, save_path):
+    """
+    Visualize ground truth and predicted bounding boxes on the image and save it.
+    """
+    # Convert tensor image to PIL Image
+    image_pil = to_pil_image(image)
+    
+    # Create figure and axis
+    fig, ax = plt.subplots(1, figsize=(12, 8))
+    ax.imshow(image_pil)
+    
+    # Draw ground truth boxes in green
+    for box, label in zip(gt_boxes, gt_labels):
+        rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
+                                 linewidth=2, edgecolor='g', facecolor='none')
+        ax.add_patch(rect)
+        ax.text(box[0], box[1], f'GT: {label}', color='g', fontsize=10, verticalalignment='top')
+    
+    # Draw predicted boxes in red
+    for box, label in zip(pred_boxes, pred_labels):
+        rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
+                                 linewidth=2, edgecolor='r', facecolor='none')
+        ax.add_patch(rect)
+        ax.text(box[0], box[1]-20, f'Pred: {label}', color='r', fontsize=10, verticalalignment='top')
+    
+    # Remove axis ticks
+    ax.set_xticks([])
+    ax.set_yticks([])
+    
+    # Set title
+    plt.title(f'Image ID: {image_id}')
+    
+    # Save the figure
+    plt.savefig(save_path, bbox_inches='tight', dpi=300)
+    plt.close(fig)
+
+def evaluate(model, data_loader, device, epoch):
     model.eval()
     coco = data_loader.dataset.coco
     coco_results = []
+    
+    # Create directory for saving images
+    save_dir = f'exps/images_with_predicted_bboxes/epoch_{epoch}'
+    os.makedirs(save_dir, exist_ok=True)
+    
+    image_count = 0
 
     for images, targets in data_loader:
         images = list(img.to(device) for img in images)
         
-        # Add this block to print model outputs
         with torch.no_grad():
             outputs = model(images)
-            print("Raw model outputs:")
-            for i, output in enumerate(outputs):
-                print(f"Image {i}:")
-                print(f"  Boxes: {output['boxes']}")
-                print(f"  Labels: {output['labels']}")
-                print(f"  Scores: {output['scores']}")
-        outputs = model(images)
+        
         for target, output in zip(targets, outputs):
             image_id = target["image_id"].item()
             boxes = output["boxes"].detach().cpu().numpy()
@@ -173,20 +213,29 @@ def evaluate(model, data_loader, device):
                     "score": float(result["score"])
                 })
 
-            print(f"Image ID: {image_id}")
-            print(f"Number of detections after filtering: {len(results)}")
-            print(f"Scores: {[result['score'] for result in results.values()]}")
-            print(f"Labels: {list(results.keys())}")
-            
-            # Print ground truth for comparison
-            gt_boxes = target["boxes"].cpu().numpy()
-            gt_labels = target["labels"].cpu().numpy()
-            print(f"Ground Truth - Number of objects: {len(gt_boxes)}")
-            print(f"Ground Truth - Labels: {gt_labels}")
+            if image_count < 5:
+                print(f"Image ID: {image_id}")
+                print(f"Number of detections after filtering: {len(results)}")
+                print(f"Scores: {[result['score'] for result in results.values()]}")
+                print(f"Labels: {list(results.keys())}")
+                
+                # Print ground truth for comparison
+                gt_boxes = target["boxes"].cpu().numpy()
+                gt_labels = target["labels"].cpu().numpy()
+                print(f"Ground Truth - Number of objects: {len(gt_boxes)}")
+                print(f"Ground Truth - Labels: {gt_labels}")
+                
+                # Visualize and save image
+                image = images[0].cpu()  # Assuming the first image in the batch
+                save_path = os.path.join(save_dir, f'image_{image_id}.png')
+                visualize_boxes(image, gt_boxes, gt_labels, boxes, labels, image_id, save_path)
+                
+                image_count += 1
             
             for box, score, label in zip(boxes, scores, labels):
                 if any(coord < 0 for coord in box) or box[2] <= box[0] or box[3] <= box[1]:
-                    print(f"Invalid box detected: {box}")
+                    if image_count < 5:
+                        print(f"Invalid box detected: {box}")
                     continue
                 
                 coco_results.append({
@@ -195,6 +244,9 @@ def evaluate(model, data_loader, device):
                     "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]],  # Convert to COCO format
                     "score": score.item(),
                 })
+        
+        if image_count >= 5:
+            break
     
     print(f"Total number of results: {len(coco_results)}")
     
@@ -433,7 +485,7 @@ def main():
         
         # Evaluate on validation set every 4 epochs
         if epoch % 2 == 0 and epoch != 0:
-            mAP = evaluate(model, val_loader, device)
+            mAP = evaluate(model, val_loader, device, epoch)
             
             print(f"Epoch {epoch}: mAP = {mAP}, Avg Loss = {avg_loss}")
 
