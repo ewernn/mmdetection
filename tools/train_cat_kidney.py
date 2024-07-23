@@ -171,7 +171,10 @@ def evaluate(model, data_loader, device, epoch):
     coco_results = []
     
     # Create directory for saving images
-    save_dir = f'exps/images_with_predicted_bboxes/epoch_{epoch}'
+    if use_colab:
+        save_dir = f'/content/drive/MyDrive/MM/CatKidney/exps/imgs_out/epoch_{epoch}'
+    else:
+        save_dir = f'exps/images_with_predicted_bboxes/epoch_{epoch}'
     os.makedirs(save_dir, exist_ok=True)
     
     image_count = 0
@@ -463,12 +466,10 @@ def main():
     model.rpn.fg_iou_thresh = 0.7  # Keep as is
     model.rpn.bg_iou_thresh = 0.3  # Keep as is
     model.roi_heads.batch_size_per_image = 256  # Increased from 128
-    #model.roi_heads.positive_fraction = 0.25  # Decreased from 0.5
-    model.roi_heads.positive_fraction = 0.5  # increased back to 0.5
-    model.roi_heads.score_thresh = 0.2  # Decreased from 0.1
-    #model.roi_heads.score_thresh = 0.05  # Decreased from 0.1
-    model.roi_heads.nms_thresh = 0.5  # Decreased from 0.5
-    model.roi_heads.detections_per_img = 10  # Decreased from 10
+    model.roi_heads.positive_fraction = 0.4  # Increased from 0.25
+    model.roi_heads.score_thresh = 0.15  # Increased from 0.05
+    model.roi_heads.nms_thresh = 0.4  # Increased from 0.3
+    model.roi_heads.detections_per_img = 15  # Increased from 5
 
     # Set pre_nms_top_n and post_nms_top_n
     model.rpn.pre_nms_top_n = lambda: 3000  # Increased from 2000
