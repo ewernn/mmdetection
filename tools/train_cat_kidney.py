@@ -260,16 +260,47 @@ def evaluate(model, data_loader, device, epoch):
     
     coco_dt = coco.loadRes(coco_results)
     coco_eval = COCOeval(coco, coco_dt, "bbox")
+    
     coco_eval.evaluate()
     coco_eval.accumulate()
     coco_eval.summarize()
-
+    
     # Print more detailed evaluation metrics
     print(f"AP @ IoU=0.50:0.95: {coco_eval.stats[0]}")
     print(f"AP @ IoU=0.50: {coco_eval.stats[1]}")
     print(f"AP @ IoU=0.75: {coco_eval.stats[2]}")
 
-    return coco_eval.stats[0]  # mAP
+    # Extract more detailed metrics
+    metrics = {
+        "mAP": coco_eval.stats[0],  # AP @ IoU=0.50:0.95
+        "AP_50": coco_eval.stats[1],  # AP @ IoU=0.50
+        "AP_75": coco_eval.stats[2],  # AP @ IoU=0.75
+        "AP_small": coco_eval.stats[3],  # AP for small objects
+        "AP_medium": coco_eval.stats[4],  # AP for medium objects
+        "AP_large": coco_eval.stats[5],  # AP for large objects
+        "AR_max_1": coco_eval.stats[6],  # AR given 1 detection per image
+        "AR_max_10": coco_eval.stats[7],  # AR given 10 detections per image
+        "AR_max_100": coco_eval.stats[8],  # AR given 100 detections per image
+        "AR_small": coco_eval.stats[9],  # AR for small objects
+        "AR_medium": coco_eval.stats[10],  # AR for medium objects
+        "AR_large": coco_eval.stats[11],  # AR for large objects
+    }
+
+    # Log per-class AP if available
+    if hasattr(coco_eval, 'eval') and 'precision' in coco_eval.eval:
+        precisions = coco_eval.eval['precision']
+        # precisions has shape (iou, recall, cls, area range, max dets)
+        for idx, cat_id in enumerate(coco_eval.params.catIds):
+            metrics[f"AP_class_{cat_id}"] = np.mean(precisions[:, :, idx, 0, -1])
+
+    # Print more detailed evaluation metrics
+    for metric, value in metrics.items():
+        print(f"{metric}: {value}")
+
+    if use_wandb:
+        wandb.log(metrics)
+
+    return metrics["mAP"]  # Still return mAP for compatibility
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     model.train()
@@ -513,7 +544,8 @@ def main():
                     "cpu_percent": cpu_percent,
                     "memory_percent": memory_percent,
                     "gpu_percent": gpu_percent,
-                    "gpu_memory_percent": gpu_memory_percent
+                    "gpu_memory_percent": gpu_memory_percent,
+                    **metrics  # all metrics from evaluate function
                 })
 
             # Update best_mAP and best_epoch
