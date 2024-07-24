@@ -195,6 +195,14 @@ def evaluate(model, data_loader, device, epoch):
             scores = output["scores"].detach().cpu().numpy()
             labels = output["labels"].detach().cpu().numpy()
             
+            # Ensure boxes, scores, and labels are 2D arrays
+            if boxes.ndim == 1:
+                boxes = boxes.reshape(1, -1)
+            if scores.ndim == 0:
+                scores = scores.reshape(1)
+            if labels.ndim == 0:
+                labels = labels.reshape(1)
+            
             # Apply NMS
             keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.7)
             boxes = boxes[keep]
@@ -239,6 +247,9 @@ def evaluate(model, data_loader, device, epoch):
                 
                 image_count += 1
             
+            if len(boxes) == 0:
+                continue
+            
             for box, score, label in zip(boxes, scores, labels):
                 if any(coord < 0 for coord in box) or box[2] <= box[0] or box[3] <= box[1]:
                     if image_count < 5:
@@ -247,9 +258,9 @@ def evaluate(model, data_loader, device, epoch):
                 
                 coco_results.append({
                     "image_id": image_id,
-                    "category_id": label.item(),
-                    "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]],  # Convert to COCO format
-                    "score": score.item(),
+                    "category_id": int(label),
+                    "bbox": [float(box[0]), float(box[1]), float(box[2] - box[0]), float(box[3] - box[1])],  # Convert to COCO format and ensure float
+                    "score": float(score),
                 })
         
         if image_count >= 5:
