@@ -15,6 +15,7 @@ import sys
 import math  # Add this import
 import argparse
 import random  # Add this import
+import time  # Add this import
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2 as fasterrcnn_resnet50_fpn
 from torchvision.models.detection import FasterRCNN_ResNet50_FPN_V2_Weights as FasterRCNN_ResNet50_FPN_Weights
 from torchvision.models.detection import FasterRCNN
