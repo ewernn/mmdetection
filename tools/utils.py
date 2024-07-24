@@ -55,12 +55,12 @@ class SmoothedValue:
     @property
     def median(self):
         d = torch.tensor(list(self.deque))
-        return d.median().item()
+        return d.median().item() if len(d) > 0 else 0.0
 
     @property
     def avg(self):
         d = torch.tensor(list(self.deque))
-        return d.mean().item()
+        return d.mean().item() if len(d) > 0 else 0.0
 
     @property
     def global_avg(self):
@@ -68,13 +68,13 @@ class SmoothedValue:
 
     @property
     def value(self):
-        return self.deque[-1]
+        return self.deque[-1] if len(self.deque) > 0 else 0.0
 
     def __str__(self):
         return self.fmt.format(
             median=self.median,
             avg=self.avg,
-            global_avg=self.global_avg if self.count > 0 else 0.0,
+            global_avg=self.global_avg,
             value=self.value)
 
 class MetricLogger:
@@ -100,7 +100,8 @@ class MetricLogger:
     def __str__(self):
         loss_str = []
         for name, meter in self.meters.items():
-            loss_str.append("{}: {}".format(name, str(meter)))
+            if isinstance(meter, SmoothedValue) and meter.count > 0:
+                loss_str.append("{}: {}".format(name, str(meter)))
         return self.delimiter.join(loss_str)
 
     def add_meter(self, name, meter):
