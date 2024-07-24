@@ -310,80 +310,51 @@ def evaluate(model, data_loader, device, epoch):
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     model.train()
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    header = 'Epoch: [{}]'.format(epoch)
-
-    # lr_scheduler = None
-    # if epoch == 0:
-    #     warmup_factor = 1. / 1000
-    #     warmup_iters = min(1000, len(data_loader) - 1)
-    #     lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
-
-
-    use_amp = device.type == 'cuda'
-    scaler = GradScaler() if use_amp else None
-
-    total_loss = 0.0
+    total_loss = 0
     num_batches = 0
+    start_time = time.time()
 
-    for images, targets in metric_logger.log_every(data_loader, print_freq, header):
+    for batch_idx, (images, targets) in enumerate(data_loader):
         images = list(image.to(device) for image in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        if use_amp:
-            with autocast():
-                loss_dict = model(images, targets)
-                losses = sum(loss for loss in loss_dict.values())
-        else:
-            loss_dict = model(images, targets)
-            losses = sum(loss for loss in loss_dict.values())
-
-        loss_dict_reduced = utils.reduce_dict(loss_dict)
-        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-
-        # Print individual loss components
-        for loss_name, loss_value in loss_dict_reduced.items():
-            print(f"{loss_name}: {loss_value}")
-
-        print(f"Total loss: {losses_reduced}")
-
-        loss_value = losses_reduced.item()
-        total_loss += loss_value
-        num_batches += 1
-
-        if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
-            print(loss_dict_reduced)
-            sys.exit(1)
+        loss_dict = model(images, targets)
+        losses = sum(loss for loss in loss_dict.values())
 
         optimizer.zero_grad()
-        if use_amp:
-            scaler.scale(losses).backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            losses.backward()
-            optimizer.step()
+        losses.backward()
+        optimizer.step()
 
-        if lr_scheduler is not None:
-            lr_scheduler.step()
+        total_loss += losses.item()
+        num_batches += 1
 
-        metric_logger.update(loss=losses_reduced)
-        metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+        if batch_idx % print_freq == 0:
+            avg_loss = total_loss / num_batches
+            elapsed_time = time.time() - start_time
+            images_per_sec = (batch_idx + 1) * len(images) / elapsed_time
+            print(f"Epoch [{epoch}][{batch_idx}/{len(data_loader)}] "
+                  f"Loss: {avg_loss:.4f} "
+                  f"Images/sec: {images_per_sec:.1f}")
 
-        # Log metrics to wandb
-        if use_wandb:
-            wandb.log({"loss": loss_value, "lr": optimizer.param_groups[0]["lr"]})
+            for img_idx, (img, target) in enumerate(zip(images, targets)):
+                print(f"Training on Image ID: {target['image_id'].item()} (Batch {batch_idx}, Item {img_idx})")
 
     avg_loss = total_loss / num_batches
-    return metric_logger, avg_loss
+    print(f"Epoch {epoch} complete. Average Loss: {avg_loss:.4f}")
+
+    return avg_loss
 
 def create_model(args, num_classes, anchor_generator):
     if args.backbone in ['resnet101', 'resnet152']:
         print(f"Using {args.backbone} as backbone")
         weights = ResNet101_Weights.IMAGENET1K_V1 if args.backbone == 'resnet101' else ResNet152_Weights.IMAGENET1K_V1
         backbone = resnet_fpn_backbone(backbone_name=args.backbone, weights=weights, trainable_layers=5)
+        
+        # For FPN backbones, we need 5 levels of anchor sizes
+        anchor_sizes = ((32,), (64,), (128,), (256,), (512,))
+        aspect_ratios = ((0.5, 1.0, 2.0),) * len(anchor_sizes)
+        anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
+        
         model = FasterRCNN(backbone, num_classes=num_classes, 
                            rpn_anchor_generator=anchor_generator)
     else:
@@ -452,17 +423,8 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, collate_fn=collate_fn)
     print("Data loaders created.")
 
-    print("Parsing anchor sizes and aspect ratios...")
-    anchor_sizes = ast.literal_eval(args.anchor_sizes)
-    aspect_ratios = ast.literal_eval(args.aspect_ratios)
-    
-    # Repeat aspect ratios for each anchor size
-    aspect_ratios = aspect_ratios * len(anchor_sizes)
-    anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
-    print("Anchor generator created.")
-
     print("Creating model...")
-    model = create_model(args, num_classes, anchor_generator)
+    model = create_model(args, num_classes, None)  # Pass None for anchor_generator
     print("Model created.")
 
     print("Modifying model parameters...")
@@ -532,7 +494,7 @@ def main():
 
     # Training loop
     for epoch in range(num_epochs):
-        metric_logger, avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
+        avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
         
         # Apply learning rate scheduler with minimum lr
         lr_scheduler.step()
