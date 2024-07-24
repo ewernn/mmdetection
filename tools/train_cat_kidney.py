@@ -152,11 +152,14 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
         ax.text(box[0], box[1], f'GT: {label}', color='g', fontsize=10, verticalalignment='top')
     
     # Draw predicted boxes in red
-    for box, label in zip(pred_boxes, pred_labels):
-        rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
-                                 linewidth=2, edgecolor='r', facecolor='none')
-        ax.add_patch(rect)
-        ax.text(box[0], box[1]-20, f'Pred: {label}', color='r', fontsize=10, verticalalignment='top')
+    if len(pred_boxes) > 0:
+        for box, label in zip(pred_boxes, pred_labels):
+            rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
+                                     linewidth=2, edgecolor='r', facecolor='none')
+            ax.add_patch(rect)
+            ax.text(box[0], box[1]-20, f'Pred: {label}', color='r', fontsize=10, verticalalignment='top')
+    else:
+        ax.text(10, 10, 'No predictions', color='r', fontsize=12, verticalalignment='top')
     
     # Remove axis ticks
     ax.set_xticks([])
@@ -196,12 +199,14 @@ def evaluate(model, data_loader, device, epoch):
             labels = output["labels"].detach().cpu().numpy()
             
             # Ensure boxes, scores, and labels are 2D arrays
-            if boxes.ndim == 1:
+            if len(boxes) == 0:
+                boxes = np.empty((0, 4))
+                scores = np.array([])
+                labels = np.array([])
+            elif boxes.ndim == 1:
                 boxes = boxes.reshape(1, -1)
-            if scores.ndim == 0:
-                scores = scores.reshape(1)
-            if labels.ndim == 0:
-                labels = labels.reshape(1)
+                scores = scores.reshape(-1)
+                labels = labels.reshape(-1)
             
             # Apply NMS
             keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.7)
@@ -209,30 +214,11 @@ def evaluate(model, data_loader, device, epoch):
             scores = scores[keep]
             labels = labels[keep]
             
-            # Select top prediction for each class
-            results = {}
-            for label in np.unique(labels):
-                class_mask = labels == label
-                if np.any(class_mask):
-                    top_idx = np.argmax(scores[class_mask])
-                    results[label] = {
-                        "box": boxes[class_mask][top_idx],
-                        "score": scores[class_mask][top_idx]
-                    }
-            
-            for label, result in results.items():
-                coco_results.append({
-                    "image_id": image_id,
-                    "category_id": int(label),
-                    "bbox": result["box"].tolist(),
-                    "score": float(result["score"])
-                })
-
             if image_count < 5:
                 print(f"Image ID: {image_id}")
-                print(f"Number of detections after filtering: {len(results)}")
-                print(f"Scores: {[result['score'] for result in results.values()]}")
-                print(f"Labels: {list(results.keys())}")
+                print(f"Number of detections after filtering: {len(boxes)}")
+                print(f"Scores: {scores}")
+                print(f"Labels: {labels}")
                 
                 # Print ground truth for comparison
                 gt_boxes = target["boxes"].cpu().numpy()
@@ -247,19 +233,11 @@ def evaluate(model, data_loader, device, epoch):
                 
                 image_count += 1
             
-            if len(boxes) == 0:
-                continue
-            
             for box, score, label in zip(boxes, scores, labels):
-                if any(coord < 0 for coord in box) or box[2] <= box[0] or box[3] <= box[1]:
-                    if image_count < 5:
-                        print(f"Invalid box detected: {box}")
-                    continue
-                
                 coco_results.append({
                     "image_id": image_id,
                     "category_id": int(label),
-                    "bbox": [float(box[0]), float(box[1]), float(box[2] - box[0]), float(box[3] - box[1])],  # Convert to COCO format and ensure float
+                    "bbox": [float(box[0]), float(box[1]), float(box[2] - box[0]), float(box[3] - box[1])],
                     "score": float(score),
                 })
         
