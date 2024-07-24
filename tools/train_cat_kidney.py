@@ -400,7 +400,8 @@ def main():
 
     # Hyperparameters
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
-    num_epochs = 300  # Set to 300 epochs
+    num_epochs = 500  # Set to 300 epochs
+    min_lr = 1e-7
     batch_size = args.batch_size
     learning_rate = args.learning_rate
 
@@ -468,10 +469,8 @@ def main():
 
     # # Modified learning rate scheduler
     # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.8)
-    lr_scheduler = CosineAnnealingLR(optimizer, T_max=300, eta_min=1e-6)
+    lr_scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=min_lr)
 
-    # Add a learning rate minimum
-    min_lr = 1e-6
 
     print("Optimizer and scheduler created.")
 
