@@ -113,16 +113,17 @@ def get_transform(train):
     if train:
         transforms.extend([
             T.RandomAffine(
-                degrees=(-15, 15),  # Increased rotation range
-                translate=(0.05, 0.05),
-                scale=(0.95, 1.05),
+                degrees=(-20, 20),
+                translate=(0.1, 0.1),
+                scale=(0.8, 1.2),
                 fill=0
             ),
             T.RandomAutocontrast(p=0.5),
-            T.Lambda(lambda x: TF.adjust_brightness(x, brightness_factor=random.uniform(0.7, 1.3))),  # More aggressive brightness adjustment
-            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.6, 1.4))),  # More aggressive contrast adjustment
-            T.GaussianBlur(kernel_size=3, sigma=(0.0, 0.4)),
-            T.RandomAdjustSharpness(sharpness_factor=1.5, p=0.3),
+            T.Lambda(lambda x: TF.adjust_brightness(x, brightness_factor=random.uniform(0.6, 1.4))),
+            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.5, 1.5))),
+            T.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
+            T.RandomAdjustSharpness(sharpness_factor=2, p=0.5),
+            T.RandomHorizontalFlip(p=0.5),
         ])
     
     # Expand grayscale to 3 channels
@@ -182,6 +183,7 @@ def evaluate(model, data_loader, device, epoch):
     os.makedirs(save_dir, exist_ok=True)
     
     image_count = 0
+    processed_image_ids = set()
 
     for images, targets in data_loader:
         images = list(img.to(device) for img in images)
@@ -220,7 +222,7 @@ def evaluate(model, data_loader, device, epoch):
                     "score": float(result["score"])
                 })
 
-            if image_count < 5:
+            if image_count < 10:
                 print(f"Image ID: {image_id}")
                 print(f"Number of detections after filtering: {len(results)}")
                 print(f"Scores: {[result['score'] for result in results.values()]}")
@@ -315,6 +317,22 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
 
+    processed_image_ids = set()
+
+    for batch_idx, (images, targets) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+        images = list(image.to(device) for image in images)
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+        # Log batch information
+        print(f"Processing batch {batch_idx}")
+        for i, target in enumerate(targets):
+            image_id = target["image_id"].item()
+            if image_id in processed_image_ids:
+                print(f"Warning: Image ID {image_id} is being processed again in training!")
+            else:
+                processed_image_ids.add(image_id)
+            print(f"Training on Image ID: {image_id} (Batch {batch_idx}, Item {i})")
+
     # lr_scheduler = None
     # if epoch == 0:
     #     warmup_factor = 1. / 1000
@@ -328,6 +346,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     total_loss = 0.0
     num_batches = 0
 
+    print_loss = True
     for images, targets in metric_logger.log_every(data_loader, print_freq, header):
         images = list(image.to(device) for image in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
@@ -343,11 +362,13 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
         loss_dict_reduced = utils.reduce_dict(loss_dict)
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
-        # Print individual loss components
-        for loss_name, loss_value in loss_dict_reduced.items():
-            print(f"{loss_name}: {loss_value}")
+        if print_loss:
+            # Print individual loss components
+            for loss_name, loss_value in loss_dict_reduced.items():
+                print(f"{loss_name}: {loss_value}")
 
-        print(f"Total loss: {losses_reduced}")
+            print(f"Total loss: {losses_reduced}")
+        print_loss = False
 
         loss_value = losses_reduced.item()
         total_loss += loss_value
@@ -380,6 +401,8 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
             wandb.log({"loss": loss_value, "lr": optimizer.param_groups[0]["lr"]})
 
     avg_loss = total_loss / num_batches
+    print(f"Total unique images processed in this epoch: {len(processed_image_ids)}")
+
     return metric_logger, avg_loss
 
 def create_model(args, num_classes, anchor_generator):
@@ -403,8 +426,8 @@ def main():
     parser.add_argument('--wandb', action='store_true', help='Use Weights & Biases for logging')
     parser.add_argument('--colab', action='store_true', help='Use Google Colab data path')
     parser.add_argument('--only_10', action='store_true', help='Use only 10 samples for quick testing')
-    parser.add_argument('--anchor_sizes', type=str, default="((161,), (192,), (219,), (252,), (311,))")
-    parser.add_argument('--aspect_ratios', type=str, default="((1.5, 2.0, 2.5),)")
+    parser.add_argument('--anchor_sizes', type=str, default="((64,), (128,), (256,), (512,))")
+    parser.add_argument('--aspect_ratios', type=str, default="((0.5, 1.0, 2.0),)")
     parser.add_argument('--backbone', type=str, default='resnet152', choices=['resnet50', 'resnet101', 'resnet152'],
                         help='Backbone architecture to use')
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
@@ -432,7 +455,7 @@ def main():
 
     # Hyperparameters
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
-    num_epochs = 300  # Set to 300 epochs
+    num_epochs = 500  # Set to 300 epochs
     batch_size = args.batch_size
     learning_rate = args.learning_rate
 
@@ -473,18 +496,18 @@ def main():
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
     # Modify other RPN and ROI parameters
-    model.rpn.nms_thresh = 0.9  # Increased from 0.7
+    model.rpn.nms_thresh = 0.7  # Increased from 0.5
     model.rpn.fg_iou_thresh = 0.7  # Keep as is
     model.rpn.bg_iou_thresh = 0.3  # Keep as is
     model.roi_heads.batch_size_per_image = 256  # Increased from 128
-    model.roi_heads.positive_fraction = 0.4  # Increased from 0.25
-    model.roi_heads.score_thresh = 0.15  # Increased from 0.05
-    model.roi_heads.nms_thresh = 0.4  # Increased from 0.3
-    model.roi_heads.detections_per_img = 15  # Increased from 5
+    model.roi_heads.positive_fraction = 0.5  # Increased from 0.25
+    model.roi_heads.score_thresh = 0.3  # Increased from 0.05
+    model.roi_heads.nms_thresh = 0.3  # Decreased from 0.4
+    model.roi_heads.detections_per_img = 5  # Reduced from 15
 
     # Set pre_nms_top_n and post_nms_top_n
-    model.rpn.pre_nms_top_n = lambda: 3000  # Increased from 2000
-    model.rpn.post_nms_top_n = lambda: 1500  # Increased from 1000
+    model.rpn.pre_nms_top_n = lambda: 1000  # Reduced from 3000
+    model.rpn.post_nms_top_n = lambda: 500  # Reduced from 1500
     print("Model parameters modified.")
 
     print("Printing trainable status of layers:")
@@ -509,7 +532,7 @@ def main():
 
     # # Modified learning rate scheduler
     # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.8)
-    lr_scheduler = CosineAnnealingLR(optimizer, T_max=300, eta_min=1e-6)
+    lr_scheduler = CosineAnnealingLR(optimizer, T_max=500, eta_min=1e-7)
 
     # Add a learning rate minimum
     min_lr = 1e-6
