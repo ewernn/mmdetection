@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from typing import Optional, Callable  # Add this import
+from typing import Optional, Callable
 import collections
 import datetime
 import time
@@ -64,7 +64,7 @@ class SmoothedValue:
 
     @property
     def global_avg(self):
-        return self.total / self.count
+        return self.total / self.count if self.count > 0 else 0.0
 
     @property
     def value(self):
@@ -74,7 +74,7 @@ class SmoothedValue:
         return self.fmt.format(
             median=self.median,
             avg=self.avg,
-            global_avg=self.global_avg,
+            global_avg=self.global_avg if self.count > 0 else 0.0,
             value=self.value)
 
 class MetricLogger:
@@ -123,7 +123,6 @@ class MetricLogger:
             'time: {time}',
             'data: {data}'
         ])
-        MB = 1024.0 * 1024.0
         for obj in iterable:
             data_time.update(time.time() - end)
             yield obj
@@ -131,9 +130,10 @@ class MetricLogger:
             if i % print_freq == 0 or i == len(iterable) - 1:
                 eta_seconds = iter_time.global_avg * (len(iterable) - i)
                 eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
+                meters = str(self) if len(self.meters) > 0 else "No metrics collected yet"
                 print(log_msg.format(
                     i, len(iterable), eta=eta_string,
-                    meters=str(self),
+                    meters=meters,
                     time=str(iter_time), data=str(data_time)))
             i += 1
             end = time.time()
