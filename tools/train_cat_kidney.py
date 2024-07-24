@@ -509,16 +509,14 @@ def main():
         
         current_lr = optimizer.param_groups[0]['lr']
         print(f"Epoch {epoch + 1}, Current learning rate: {current_lr}")
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = max(param_group['lr'], min_lr)
-        
-        if epoch > 30:
-            model.roi_heads.score_thresh = .25
+
+        # Train for one epoch
+        avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
 
         # Evaluate on validation set every 5 epochs
         if (epoch + 1) % 5 == 0:
             metrics = evaluate(model, val_loader, device, epoch)
-            mAP = metrics.get("mAP", 0.0)  # Use .get() with a default value
+            mAP = metrics.get("mAP", 0.0)
             
             print(f"Epoch {epoch + 1}: mAP = {mAP}, Avg Loss = {avg_loss}")
 
