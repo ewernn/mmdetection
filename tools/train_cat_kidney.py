@@ -111,18 +111,18 @@ def get_transform(train):
     if train:
         transforms.extend([
             T.RandomAffine(
-                degrees=(-15, 15),  # Increased rotation range
-                translate=(0.05, 0.05),
-                scale=(0.95, 1.05),
+                degrees=(-20, 20),
+                translate=(0.1, 0.1),
+                scale=(0.9, 1.1),
                 fill=0
             ),
             T.RandomAutocontrast(p=0.5),
-            T.Lambda(lambda x: TF.adjust_brightness(x, brightness_factor=random.uniform(0.7, 1.3))),  # More aggressive brightness adjustment
-            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.6, 1.4))),  # More aggressive contrast adjustment
-            T.GaussianBlur(kernel_size=3, sigma=(0.0, 0.4)),
-            T.RandomAdjustSharpness(sharpness_factor=1.5, p=0.3),
+            T.Lambda(lambda x: TF.adjust_brightness(x, brightness_factor=random.uniform(0.6, 1.4))),
+            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.5, 1.5))),
+            T.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
+            T.RandomAdjustSharpness(sharpness_factor=2, p=0.5),
+            #T.RandomHorizontalFlip(p=0.5),
         ])
-        
     
     # Expand grayscale to 3 channels
     transforms.append(T.Lambda(lambda x: x.repeat(3, 1, 1) if x.shape[0] == 1 else x))
