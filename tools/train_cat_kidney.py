@@ -259,7 +259,7 @@ def evaluate(model, data_loader, device, epoch):
     
     if len(coco_results) == 0:
         print("No valid detections found. Returning 0 mAP.")
-        return 0.0
+        return {"mAP": 0.0, "AP_50": 0.0, "AP_75": 0.0}  # Return a dictionary with zero values
     
     # Print a sample result
     print("Sample detection result:")
@@ -439,7 +439,7 @@ def main():
     model.rpn.bg_iou_thresh = 0.3  # Keep as is
     model.roi_heads.batch_size_per_image = 256  # Increased from 128
     model.roi_heads.positive_fraction = 0.4  # Increased from 0.25
-    model.roi_heads.score_thresh = 0.2  # Increased from 0.05
+    model.roi_heads.score_thresh = 0.1  # Increased from 0.05
     model.roi_heads.nms_thresh = 0.3  # Decreased from 0.4
     model.roi_heads.detections_per_img = 15  # Increased from 5
 
@@ -492,21 +492,38 @@ def main():
 
     print(f"Validation dataset size: {len(val_dataset)}")
 
-    # Training loop
+    # After creating the optimizer and before the training loop, add this:
+    initial_lr = learning_rate
+    warmup_epochs = 5
+
+    # In the training loop, replace the existing learning rate adjustment with this:
     for epoch in range(num_epochs):
-        avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
+        if epoch < warmup_epochs:
+            # Linear warmup
+            lr = initial_lr * ((epoch + 1) / warmup_epochs)
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
+        else:
+            # Your existing learning rate schedule
+            lr_scheduler.step()
         
-        # Apply learning rate scheduler with minimum lr
-        lr_scheduler.step()
+        current_lr = optimizer.param_groups[0]['lr']
+        print(f"Epoch {epoch + 1}, Current learning rate: {current_lr}")
         for param_group in optimizer.param_groups:
             param_group['lr'] = max(param_group['lr'], min_lr)
         
+        if epoch > 30:
+            model.roi_heads.score_thresh = .25
+
         # Evaluate on validation set every 5 epochs
         if (epoch + 1) % 5 == 0:
             metrics = evaluate(model, val_loader, device, epoch)
-            mAP = metrics["mAP"]
+            mAP = metrics.get("mAP", 0.0)  # Use .get() with a default value
             
             print(f"Epoch {epoch + 1}: mAP = {mAP}, Avg Loss = {avg_loss}")
+
+            if mAP == 0.0:
+                print("Warning: Model failed to detect any objects. Consider adjusting model parameters or checking the dataset.")
 
             if use_wandb:
                 # Get CPU usage
