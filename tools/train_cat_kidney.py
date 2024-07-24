@@ -10,18 +10,17 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from tqdm import tqdm
 import wandb
-import tools.utils as utils # Import your custom utils
 import sys
-import math  # Add this import
+import math
 import argparse
-import random  # Add this import
+import random
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2 as fasterrcnn_resnet50_fpn
 from torchvision.models.detection import FasterRCNN_ResNet50_FPN_V2_Weights as FasterRCNN_ResNet50_FPN_Weights
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.anchor_utils import AnchorGenerator
-from torch.cuda.amp import GradScaler, autocast	
+from torch.cuda.amp import GradScaler, autocast
 import torch.nn as nn
 from collections import OrderedDict
 import torchvision
@@ -38,7 +37,7 @@ from torchvision.io import read_image
 from torchvision.transforms.functional import to_pil_image
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.nn.utils import clip_grad_norm_
-
+import time
 
 
 # Initialize global variables
@@ -311,99 +310,41 @@ def evaluate(model, data_loader, device, epoch):
 
     return metrics
 
-def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
+def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=10):
     model.train()
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    header = 'Epoch: [{}]'.format(epoch)
-
-    processed_image_ids = set()
-
-    for batch_idx, (images, targets) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        images = list(image.to(device) for image in images)
-        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
-        # Log batch information
-        print(f"Processing batch {batch_idx}")
-        for i, target in enumerate(targets):
-            image_id = target["image_id"].item()
-            if image_id in processed_image_ids:
-                print(f"Warning: Image ID {image_id} is being processed again in training!")
-            else:
-                processed_image_ids.add(image_id)
-            print(f"Training on Image ID: {image_id} (Batch {batch_idx}, Item {i})")
-
-    # lr_scheduler = None
-    # if epoch == 0:
-    #     warmup_factor = 1. / 1000
-    #     warmup_iters = min(1000, len(data_loader) - 1)
-    #     lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
-
-
-    use_amp = device.type == 'cuda'
-    scaler = GradScaler() if use_amp else None
-
-    total_loss = 0.0
+    total_loss = 0
     num_batches = 0
+    start_time = time.time()
 
-    print_loss = True
-    for images, targets in metric_logger.log_every(data_loader, print_freq, header):
+    for batch_idx, (images, targets) in enumerate(data_loader):
         images = list(image.to(device) for image in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        if use_amp:
-            with autocast():
-                loss_dict = model(images, targets)
-                losses = sum(loss for loss in loss_dict.values())
-        else:
-            loss_dict = model(images, targets)
-            losses = sum(loss for loss in loss_dict.values())
-
-        loss_dict_reduced = utils.reduce_dict(loss_dict)
-        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-
-        if print_loss:
-            # Print individual loss components
-            for loss_name, loss_value in loss_dict_reduced.items():
-                print(f"{loss_name}: {loss_value}")
-
-            print(f"Total loss: {losses_reduced}")
-        print_loss = False
-
-        loss_value = losses_reduced.item()
-        total_loss += loss_value
-        num_batches += 1
-
-        if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
-            print(loss_dict_reduced)
-            sys.exit(1)
-
-        clip_grad_norm_(model.parameters(), max_norm=1.0)
+        loss_dict = model(images, targets)
+        losses = sum(loss for loss in loss_dict.values())
 
         optimizer.zero_grad()
-        if use_amp:
-            scaler.scale(losses).backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            losses.backward()
-            optimizer.step()
+        losses.backward()
+        optimizer.step()
 
-        # if lr_scheduler is not None:
-        #     lr_scheduler.step()
+        total_loss += losses.item()
+        num_batches += 1
 
-        metric_logger.update(loss=losses_reduced)
-        metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+        if batch_idx % print_freq == 0:
+            avg_loss = total_loss / num_batches
+            elapsed_time = time.time() - start_time
+            images_per_sec = (batch_idx + 1) * len(images) / elapsed_time
+            print(f"Epoch [{epoch}][{batch_idx}/{len(data_loader)}] "
+                  f"Loss: {avg_loss:.4f} "
+                  f"Images/sec: {images_per_sec:.1f}")
 
-        # Log metrics to wandb
-        if use_wandb:
-            wandb.log({"loss": loss_value, "lr": optimizer.param_groups[0]["lr"]})
+            for img_idx, (img, target) in enumerate(zip(images, targets)):
+                print(f"Training on Image ID: {target['image_id'].item()} (Batch {batch_idx}, Item {img_idx})")
 
     avg_loss = total_loss / num_batches
-    print(f"Total unique images processed in this epoch: {len(processed_image_ids)}")
+    print(f"Epoch {epoch} complete. Average Loss: {avg_loss:.4f}")
 
-    return metric_logger, avg_loss
+    return avg_loss
 
 def create_model(args, num_classes, anchor_generator):
     if args.backbone in ['resnet101', 'resnet152']:
@@ -558,7 +499,7 @@ def main():
 
     # Training loop
     for epoch in range(num_epochs):
-        metric_logger, avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
+        avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
         
         # Apply learning rate scheduler with minimum lr
         lr_scheduler.step()
