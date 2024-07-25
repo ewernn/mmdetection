@@ -177,6 +177,44 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     plt.savefig(save_path, bbox_inches='tight', dpi=300)
     plt.close(fig)
 
+def filter_kidney_predictions(boxes, scores, labels, iou_threshold=0.5):
+    # Convert to numpy for easier manipulation
+    boxes = boxes.detach().cpu().numpy()
+    scores = scores.detach().cpu().numpy()
+    labels = labels.detach().cpu().numpy()
+
+    # Create a dictionary to store the best prediction for each class
+    best_predictions = {}
+
+    for box, score, label in zip(boxes, scores, labels):
+        label = int(label)
+        if label not in best_predictions or score > best_predictions[label][1]:
+            best_predictions[label] = (box, score)
+
+    # Convert back to tensors
+    final_boxes = []
+    final_scores = []
+    final_labels = []
+
+    for label, (box, score) in best_predictions.items():
+        final_boxes.append(box)
+        final_scores.append(score)
+        final_labels.append(label)
+
+    if len(final_boxes) > 0:
+        return torch.tensor(final_boxes), torch.tensor(final_scores), torch.tensor(final_labels)
+    else:
+        return torch.empty((0, 4)), torch.empty(0), torch.empty(0, dtype=torch.long)
+
+    # If we don't have 2 kidneys, take the highest scoring remaining boxes
+    while len(final_boxes) < 2 and len(boxes) > len(final_boxes):
+        idx = len(final_boxes)
+        final_boxes.append(boxes[idx])
+        final_scores.append(scores[idx])
+        final_labels.append(labels[idx])
+
+    return torch.stack(final_boxes), torch.stack(final_scores), torch.stack(final_labels)
+
 def evaluate(model, data_loader, device, epoch):
     model.eval()
     coco = data_loader.dataset.coco
@@ -199,9 +237,17 @@ def evaluate(model, data_loader, device, epoch):
         
         for i, (target, output) in enumerate(zip(targets, outputs)):
             image_id = target["image_id"].item()
-            boxes = output["boxes"].detach().cpu().numpy()
-            scores = output["scores"].detach().cpu().numpy()
-            labels = output["labels"].detach().cpu().numpy()
+            boxes = output["boxes"]
+            scores = output["scores"]
+            labels = output["labels"]
+            
+            # Apply the filtering
+            boxes, scores, labels = filter_kidney_predictions(boxes, scores, labels)
+            
+            # Convert to numpy and ensure 2D arrays
+            boxes = boxes.detach().cpu().numpy()
+            scores = scores.detach().cpu().numpy()
+            labels = labels.detach().cpu().numpy()
             
             # Ensure boxes, scores, and labels are 2D arrays
             if len(boxes) == 0:
@@ -463,11 +509,11 @@ def main():
     model.roi_heads.positive_fraction = 0.4  # Keep as is
     model.roi_heads.score_thresh = 0.05  # Lowered from 0.1 to allow lower confidence detections
     model.roi_heads.nms_thresh = 0.3  # Loosen from 0.3 to allow more overlap
-    model.roi_heads.detections_per_img = 2  # Set to 2 as there are always exactly two kidneys
+    model.roi_heads.detections_per_img = 10  # Increase from 2 to 10
 
     # Set pre_nms_top_n and post_nms_top_n
-    model.rpn.pre_nms_top_n = lambda: 3000  # Increased back to 3000
-    model.rpn.post_nms_top_n = lambda: 1500  # Increased back to 1500
+    model.rpn.pre_nms_top_n = lambda: 2000  # Decreased from 3000
+    model.rpn.post_nms_top_n = lambda: 1000  # Decreased from 1500
 
     print("Model parameters modified.")
 
