@@ -197,7 +197,7 @@ def evaluate(model, data_loader, device, epoch):
         with torch.no_grad():
             outputs = model(images)
         
-        for target, output in zip(targets, outputs):
+        for i, (target, output) in enumerate(zip(targets, outputs)):
             image_id = target["image_id"].item()
             boxes = output["boxes"].detach().cpu().numpy()
             scores = output["scores"].detach().cpu().numpy()
@@ -209,7 +209,6 @@ def evaluate(model, data_loader, device, epoch):
                 scores = np.array([])
                 labels = np.array([])
             else:
-                # Ensure boxes, scores, and labels are 2D arrays even if there's only one detection
                 boxes = np.atleast_2d(boxes)
                 scores = np.atleast_1d(scores)
                 labels = np.atleast_1d(labels)
@@ -233,8 +232,10 @@ def evaluate(model, data_loader, device, epoch):
                 print(f"Ground Truth - Labels: {gt_labels}")
                 
                 # Visualize and save image
-                image = images[0].cpu()  # Assuming the first image in the batch
+                image = images[i].cpu()  # Ensure the correct image is used
                 save_path = os.path.join(save_dir, f'image_{image_id}.png')
+                print(f"Visualizing Image ID: {image_id}, Save Path: {save_path}")
+                print(f"Image Shape: {image.shape}, GT Boxes: {gt_boxes}, GT Labels: {gt_labels}, Pred Boxes: {boxes}, Pred Labels: {labels}")
                 visualize_boxes(image, gt_boxes, gt_labels, boxes, labels, image_id, save_path)
                 
                 image_count += 1
