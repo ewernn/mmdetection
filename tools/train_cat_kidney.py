@@ -454,7 +454,7 @@ def main():
     model.roi_heads.positive_fraction = 0.4
     model.roi_heads.score_thresh = 0.1
     model.roi_heads.nms_thresh = 0.1  # lowered from 0.2 to prevent overlap
-    model.roi_heads.detections_per_img = 2  # Always exactly two kidneys
+    model.roi_heads.detections_per_img = 15  # Always exactly two kidneys
 
     # Set pre_nms_top_n and post_nms_top_n
     model.rpn.pre_nms_top_n = lambda: 3000
