@@ -310,6 +310,7 @@ def evaluate(model, data_loader, device, epoch):
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     model.train()
+    scaler = GradScaler()
     total_loss = 0
     num_batches = 0
     start_time = time.time()
@@ -318,13 +319,15 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
         images = list(image.to(device) for image in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        loss_dict = model(images, targets)
-        losses = sum(loss for loss in loss_dict.values())
+        with autocast():
+            loss_dict = model(images, targets)
+            losses = sum(loss for loss in loss_dict.values())
+
+        scaler.scale(losses).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         optimizer.zero_grad()
-        losses.backward()
-        optimizer.step()
-
         total_loss += losses.item()
         num_batches += 1
 
@@ -372,18 +375,18 @@ def adjust_overlap_parameters(model, epoch):
             # Calculate new thresholds based on the current epoch
             new_nms_thresh = 0.9 - (epoch / 45) * 0.4  # Example: decrease from 0.9 to 0.5
             new_score_thresh = 0.05 + (epoch / 45) * 0.05  # Example: increase from 0.05 to 0.1
-            new_detections_per_img = 50 - (epoch / 45) * 35  # Example: decrease from 50 to 15
+            new_detections_per_img = 2  # Set to 2 as there are always exactly two kidneys
 
             # Apply new thresholds
             model.roi_heads.nms_thresh = new_nms_thresh
             model.roi_heads.score_thresh = new_score_thresh
-            model.roi_heads.detections_per_img = int(new_detections_per_img)
+            model.roi_heads.detections_per_img = new_detections_per_img
             print(f"Adjusted parameters at epoch {epoch}: NMS Thresh={new_nms_thresh}, Score Thresh={new_score_thresh}, Detections per Img={new_detections_per_img}")
     else:
         # Keep parameters steady after 45 epochs
         model.roi_heads.nms_thresh = 0.5
         model.roi_heads.score_thresh = 0.1
-        model.roi_heads.detections_per_img = 15
+        model.roi_heads.detections_per_img = 2  # Set to 2 as there are always exactly two kidneys
 
 def main():
     global use_wandb, use_colab
@@ -460,7 +463,7 @@ def main():
     model.roi_heads.positive_fraction = 0.4  # Keep as is
     model.roi_heads.score_thresh = 0.05  # Lowered from 0.1 to allow lower confidence detections
     model.roi_heads.nms_thresh = 0.9  # Loosen from 0.3 to allow more overlap
-    model.roi_heads.detections_per_img = 50  # Increased from 15 to allow more detections per image
+    model.roi_heads.detections_per_img = 2  # Set to 2 as there are always exactly two kidneys
 
     # Set pre_nms_top_n and post_nms_top_n
     model.rpn.pre_nms_top_n = lambda: 3000  # Increased back to 3000
