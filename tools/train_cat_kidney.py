@@ -368,26 +368,6 @@ def create_model(args, num_classes, anchor_generator):
     
     return model
 
-def adjust_overlap_parameters(model, epoch):
-    # Define epochs at which parameters should be adjusted
-    if epoch <= 45:
-        if epoch % 15 == 0:  # Adjust parameters every 15 epochs
-            # Calculate new thresholds based on the current epoch
-            new_nms_thresh = 0.9 - (epoch / 45) * 0.4  # Example: decrease from 0.9 to 0.5
-            new_score_thresh = 0.05 + (epoch / 45) * 0.05  # Example: increase from 0.05 to 0.1
-            new_detections_per_img = 2  # Set to 2 as there are always exactly two kidneys
-
-            # Apply new thresholds
-            model.roi_heads.nms_thresh = new_nms_thresh
-            model.roi_heads.score_thresh = new_score_thresh
-            model.roi_heads.detections_per_img = new_detections_per_img
-            print(f"Adjusted parameters at epoch {epoch}: NMS Thresh={new_nms_thresh}, Score Thresh={new_score_thresh}, Detections per Img={new_detections_per_img}")
-    else:
-        # Keep parameters steady after 45 epochs
-        model.roi_heads.nms_thresh = 0.5
-        model.roi_heads.score_thresh = 0.1
-        model.roi_heads.detections_per_img = 2  # Set to 2 as there are always exactly two kidneys
-
 def main():
     global use_wandb, use_colab
     parser = argparse.ArgumentParser(description='Train Cat Kidney Detection Model')
@@ -455,19 +435,19 @@ def main():
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
-    # Modify other RPN and ROI parameters
-    model.rpn.nms_thresh = 0.9  # Loosen from 0.5 to allow more overlap initially
-    model.rpn.fg_iou_thresh = 0.7  # Keep as is
-    model.rpn.bg_iou_thresh = 0.3  # Keep as is
-    model.roi_heads.batch_size_per_image = 256  # Keep as is
-    model.roi_heads.positive_fraction = 0.4  # Keep as is
-    model.roi_heads.score_thresh = 0.05  # Lowered from 0.1 to allow lower confidence detections
-    model.roi_heads.nms_thresh = 0.9  # Loosen from 0.3 to allow more overlap
-    model.roi_heads.detections_per_img = 2  # Set to 2 as there are always exactly two kidneys
+    # Set model parameters statically
+    model.rpn.nms_thresh = 0.9
+    model.rpn.fg_iou_thresh = 0.7
+    model.rpn.bg_iou_thresh = 0.3
+    model.roi_heads.batch_size_per_image = 256
+    model.roi_heads.positive_fraction = 0.4
+    model.roi_heads.score_thresh = 0.1
+    model.roi_heads.nms_thresh = 0.1  # lowered from 0.2 to prevent overlap
+    model.roi_heads.detections_per_img = 2  # Always exactly two kidneys
 
     # Set pre_nms_top_n and post_nms_top_n
-    model.rpn.pre_nms_top_n = lambda: 3000  # Increased back to 3000
-    model.rpn.post_nms_top_n = lambda: 1500  # Increased back to 1500
+    model.rpn.pre_nms_top_n = lambda: 3000
+    model.rpn.post_nms_top_n = lambda: 1500
     print("Model parameters modified.")
 
     print("Printing trainable status of layers:")
@@ -490,10 +470,7 @@ def main():
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.005)
 
-    # # Modified learning rate scheduler
-    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.8)
     lr_scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=min_lr)
-
 
     print("Optimizer and scheduler created.")
 
@@ -520,8 +497,6 @@ def main():
 
     # In the training loop, replace the existing learning rate adjustment with this:
     for epoch in range(num_epochs):
-        adjust_overlap_parameters(model, epoch)  # Adjust model parameters based on the current epoch
-
         if epoch < warmup_epochs:
             # Linear warmup
             lr = initial_lr * ((epoch + 1) / warmup_epochs)
