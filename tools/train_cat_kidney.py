@@ -462,12 +462,13 @@ def main():
     model.roi_heads.batch_size_per_image = 256  # Keep as is
     model.roi_heads.positive_fraction = 0.4  # Keep as is
     model.roi_heads.score_thresh = 0.05  # Lowered from 0.1 to allow lower confidence detections
-    model.roi_heads.nms_thresh = 0.9  # Loosen from 0.3 to allow more overlap
+    model.roi_heads.nms_thresh = 0.3  # Loosen from 0.3 to allow more overlap
     model.roi_heads.detections_per_img = 2  # Set to 2 as there are always exactly two kidneys
 
     # Set pre_nms_top_n and post_nms_top_n
     model.rpn.pre_nms_top_n = lambda: 3000  # Increased back to 3000
     model.rpn.post_nms_top_n = lambda: 1500  # Increased back to 1500
+
     print("Model parameters modified.")
 
     print("Printing trainable status of layers:")
