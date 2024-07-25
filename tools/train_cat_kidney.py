@@ -467,9 +467,9 @@ def main():
     # Hyperparameters
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
     num_epochs = 500  # Set to 300 epochs
-    min_lr = 1e-7
     batch_size = args.batch_size
     learning_rate = args.learning_rate
+    min_lr = args.learning_rate / 50
 
     if use_wandb and not args.no_sweep:
         learning_rate = wandb.config.learning_rate
