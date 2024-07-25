@@ -238,13 +238,13 @@ def evaluate(model, data_loader, device, epoch):
             scores = output["scores"]
             labels = output["labels"]
             
-            # Apply the filtering
-            boxes, scores, labels = filter_kidney_predictions(boxes, scores, labels)
-            
-            # Convert to numpy and ensure 2D arrays
+            # Convert to numpy before filtering
             boxes = boxes.detach().cpu().numpy()
             scores = scores.detach().cpu().numpy()
             labels = labels.detach().cpu().numpy()
+            
+            # Apply the filtering
+            boxes, scores, labels = filter_kidney_predictions(boxes, scores, labels)
             
             # Ensure boxes, scores, and labels are 2D arrays
             if len(boxes) == 0:
@@ -257,7 +257,7 @@ def evaluate(model, data_loader, device, epoch):
                 labels = np.atleast_1d(labels)
             
             # Apply NMS
-            keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.9)  # Loosen NMS IoU threshold
+            keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.9)
             boxes = boxes[keep]
             scores = scores[keep]
             labels = labels[keep]
