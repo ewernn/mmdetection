@@ -324,6 +324,10 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
             losses = sum(loss for loss in loss_dict.values())
 
         scaler.scale(losses).backward()
+
+        # Implement gradient clipping
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
         scaler.step(optimizer)
         scaler.update()
 
@@ -404,9 +408,9 @@ def main():
     # Hyperparameters
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
     num_epochs = 500  # Set to 300 epochs
-    min_lr = 1e-7
     batch_size = args.batch_size
     learning_rate = args.learning_rate
+    min_lr = args.learning_rate / 100  # 1e-7
 
     if use_wandb and not args.no_sweep:
         learning_rate = wandb.config.learning_rate
@@ -436,7 +440,7 @@ def main():
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
     # Set model parameters statically
-    model.rpn.nms_thresh = 0.9
+    model.rpn.nms_thresh = 0.5
     model.rpn.fg_iou_thresh = 0.7
     model.rpn.bg_iou_thresh = 0.3
     model.roi_heads.batch_size_per_image = 256
