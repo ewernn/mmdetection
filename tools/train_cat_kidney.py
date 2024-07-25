@@ -214,7 +214,7 @@ def evaluate(model, data_loader, device, epoch):
                 labels = np.atleast_1d(labels)
             
             # Apply NMS
-            keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.7)
+            keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.9)  # Loosen NMS IoU threshold
             boxes = boxes[keep]
             scores = scores[keep]
             labels = labels[keep]
@@ -240,13 +240,16 @@ def evaluate(model, data_loader, device, epoch):
                 
                 image_count += 1
             
-            for box, score, label in zip(boxes, scores, labels):
-                coco_results.append({
-                    "image_id": image_id,
-                    "category_id": int(label),
-                    "bbox": [float(box[0]), float(box[1]), float(box[2] - box[0]), float(box[3] - box[1])],
-                    "score": float(score),
-                })
+            if len(boxes) == 0 or len(scores) == 0 or len(labels) == 0:
+                print("No detections to process.")
+            else: # Your existing code
+                for box, score, label in zip(boxes, scores, labels):
+                    coco_results.append({
+                        "image_id": image_id,
+                        "category_id": int(label),
+                        "bbox": [float(box[0]), float(box[1]), float(box[2] - box[0]), float(box[3] - box[1])],
+                        "score": float(score),
+                    })
         
         if image_count >= 5:
             break
@@ -362,6 +365,26 @@ def create_model(args, num_classes, anchor_generator):
     
     return model
 
+def adjust_overlap_parameters(model, epoch):
+    # Define epochs at which parameters should be adjusted
+    if epoch <= 45:
+        if epoch % 15 == 0:  # Adjust parameters every 15 epochs
+            # Calculate new thresholds based on the current epoch
+            new_nms_thresh = 0.9 - (epoch / 45) * 0.4  # Example: decrease from 0.9 to 0.5
+            new_score_thresh = 0.05 + (epoch / 45) * 0.05  # Example: increase from 0.05 to 0.1
+            new_detections_per_img = 50 - (epoch / 45) * 35  # Example: decrease from 50 to 15
+
+            # Apply new thresholds
+            model.roi_heads.nms_thresh = new_nms_thresh
+            model.roi_heads.score_thresh = new_score_thresh
+            model.roi_heads.detections_per_img = int(new_detections_per_img)
+            print(f"Adjusted parameters at epoch {epoch}: NMS Thresh={new_nms_thresh}, Score Thresh={new_score_thresh}, Detections per Img={new_detections_per_img}")
+    else:
+        # Keep parameters steady after 45 epochs
+        model.roi_heads.nms_thresh = 0.5
+        model.roi_heads.score_thresh = 0.1
+        model.roi_heads.detections_per_img = 15
+
 def main():
     global use_wandb, use_colab
     parser = argparse.ArgumentParser(description='Train Cat Kidney Detection Model')
@@ -430,18 +453,18 @@ def main():
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
     # Modify other RPN and ROI parameters
-    model.rpn.nms_thresh = 0.5  # Increased from 0.7
+    model.rpn.nms_thresh = 0.9  # Loosen from 0.5 to allow more overlap initially
     model.rpn.fg_iou_thresh = 0.7  # Keep as is
     model.rpn.bg_iou_thresh = 0.3  # Keep as is
-    model.roi_heads.batch_size_per_image = 256  # Increased from 128
-    model.roi_heads.positive_fraction = 0.4  # Increased from 0.25
-    model.roi_heads.score_thresh = 0.1  # Increased from 0.05
-    model.roi_heads.nms_thresh = 0.3  # Decreased from 0.4
-    model.roi_heads.detections_per_img = 15  # Increased from 5
+    model.roi_heads.batch_size_per_image = 256  # Keep as is
+    model.roi_heads.positive_fraction = 0.4  # Keep as is
+    model.roi_heads.score_thresh = 0.05  # Lowered from 0.1 to allow lower confidence detections
+    model.roi_heads.nms_thresh = 0.9  # Loosen from 0.3 to allow more overlap
+    model.roi_heads.detections_per_img = 50  # Increased from 15 to allow more detections per image
 
     # Set pre_nms_top_n and post_nms_top_n
-    model.rpn.pre_nms_top_n = lambda: 1000  # Reduced from 3000
-    model.rpn.post_nms_top_n = lambda: 500  # Reduced from 1500
+    model.rpn.pre_nms_top_n = lambda: 3000  # Increased back to 3000
+    model.rpn.post_nms_top_n = lambda: 1500  # Increased back to 1500
     print("Model parameters modified.")
 
     print("Printing trainable status of layers:")
@@ -494,6 +517,8 @@ def main():
 
     # In the training loop, replace the existing learning rate adjustment with this:
     for epoch in range(num_epochs):
+        adjust_overlap_parameters(model, epoch)  # Adjust model parameters based on the current epoch
+
         if epoch < warmup_epochs:
             # Linear warmup
             lr = initial_lr * ((epoch + 1) / warmup_epochs)
