@@ -328,11 +328,14 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, wa
         # Implement gradient clipping
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
-        # Linear warmup of the learning rate
+        # Adjust the learning rate
         if epoch < warmup_epochs:
             lr = initial_lr * ((epoch * len(data_loader) + batch_idx + 1) / (warmup_epochs * len(data_loader)))
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = lr
+        else:
+            lr = optimizer.param_groups[0]['lr']  # Use the current lr from the optimizer outside the warmup period
+
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
 
         scaler.step(optimizer)
         scaler.update()
