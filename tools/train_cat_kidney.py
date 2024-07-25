@@ -308,7 +308,7 @@ def evaluate(model, data_loader, device, epoch):
 
     return metrics
 
-def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
+def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, warmup_epochs=5, initial_lr=7e-5):
     model.train()
     scaler = GradScaler()
     total_loss = 0
@@ -328,6 +328,12 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
         # Implement gradient clipping
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
+        # Linear warmup of the learning rate
+        if epoch < warmup_epochs:
+            lr = initial_lr * ((epoch * len(data_loader) + batch_idx + 1) / (warmup_epochs * len(data_loader)))
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
+
         scaler.step(optimizer)
         scaler.update()
 
@@ -341,10 +347,8 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
             images_per_sec = (batch_idx + 1) * len(images) / elapsed_time
             print(f"Epoch [{epoch}][{batch_idx}/{len(data_loader)}] "
                   f"Loss: {avg_loss:.4f} "
-                  f"Images/sec: {images_per_sec:.1f}")
-
-            for img_idx, (img, target) in enumerate(zip(images, targets)):
-                print(f"Training on Image ID: {target['image_id'].item()} (Batch {batch_idx}, Item {img_idx})")
+                  f"Images/sec: {images_per_sec:.1f} "
+                  f"LR: {lr:.6f}")
 
     avg_loss = total_loss / num_batches
     print(f"Epoch {epoch} complete. Average Loss: {avg_loss:.4f}")
@@ -514,7 +518,7 @@ def main():
         print(f"Epoch {epoch + 1}, Current learning rate: {current_lr}")
 
         # Train for one epoch
-        avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
+        avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, initial_lr=initial_lr, print_freq=50)
 
         # Evaluate on validation set every 5 epochs
         if (epoch + 1) % 5 == 0:
