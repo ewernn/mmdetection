@@ -203,10 +203,11 @@ def evaluate(model, data_loader, device, epoch):
                 boxes = np.empty((0, 4))
                 scores = np.array([])
                 labels = np.array([])
-            elif boxes.ndim == 1:
-                boxes = boxes.reshape(1, -1)
-                scores = scores.reshape(-1)
-                labels = labels.reshape(-1)
+            else:
+                # Ensure boxes, scores, and labels are 2D arrays even if there's only one detection
+                boxes = np.atleast_2d(boxes)
+                scores = np.atleast_1d(scores)
+                labels = np.atleast_1d(labels)
             
             # Apply NMS
             keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.7)
