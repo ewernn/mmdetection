@@ -137,6 +137,10 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     """
     Visualize ground truth and predicted bounding boxes on the image and save it.
     """
+    # Debugging: Print shapes and types to understand the data structure at this point
+    print(f"pred_boxes type: {type(pred_boxes)}, shape: {pred_boxes.shape}")
+    print(f"pred_labels type: {type(pred_labels)}, shape: {pred_labels.shape if hasattr(pred_labels, 'shape') else 'N/A'}")
+
     # Convert tensor image to PIL Image
     image_pil = to_pil_image(image)
     
@@ -144,6 +148,7 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     fig, ax = plt.subplots(1, figsize=(12, 8))
     ax.imshow(image_pil)
     
+    pred_labels = np.atleast_1d(pred_labels)
     # Draw ground truth boxes in green
     for box, label in zip(gt_boxes, gt_labels):
         rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
