@@ -388,7 +388,7 @@ def main():
     only_10 = args.only_10
 
     if use_wandb:
-        wandb.init(project="feline_kidney_detection", config=args)
+        wandb.init(project="cat_kidney_compiled", config=args)
 
     # Paths
     if use_colab:
