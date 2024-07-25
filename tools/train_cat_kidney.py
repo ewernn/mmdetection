@@ -139,7 +139,7 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     """
     # Debugging: Print shapes and types to understand the data structure at this point
     print(f"pred_boxes type: {type(pred_boxes)}, shape: {pred_boxes.shape}")
-    print(f"pred_labels type: {type(pred_labels)}, shape: {pred_labels.shape if hasattr(pred_labels, 'shape') else 'N/A'}")
+    print(f"pred_labels type: {type(pred_labels)}, shape: {pred_labels.shape}")
 
     # Convert tensor image to PIL Image
     image_pil = to_pil_image(image)
@@ -148,7 +148,9 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     fig, ax = plt.subplots(1, figsize=(12, 8))
     ax.imshow(image_pil)
     
+    # Ensure pred_labels is always a 1D array
     pred_labels = np.atleast_1d(pred_labels)
+    
     # Draw ground truth boxes in green
     for box, label in zip(gt_boxes, gt_labels):
         rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
@@ -159,10 +161,13 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     # Draw predicted boxes in red
     if len(pred_boxes) > 0:
         for box, label in zip(pred_boxes, pred_labels):
-            rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
-                                     linewidth=2, edgecolor='r', facecolor='none')
-            ax.add_patch(rect)
-            ax.text(box[0], box[1]-20, f'Pred: {label}', color='r', fontsize=10, verticalalignment='top')
+            if len(box) == 4:  # Ensure box has 4 coordinates
+                rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
+                                         linewidth=2, edgecolor='r', facecolor='none')
+                ax.add_patch(rect)
+                ax.text(box[0], box[1]-20, f'Pred: {label}', color='r', fontsize=10, verticalalignment='top')
+            else:
+                print(f"Warning: Invalid box format: {box}")
     else:
         ax.text(10, 10, 'No predictions', color='r', fontsize=12, verticalalignment='top')
     
@@ -201,19 +206,11 @@ def filter_kidney_predictions(boxes, scores, labels, iou_threshold=0.5):
         final_scores.append(score)
         final_labels.append(label)
 
+    # Ensure we always return 2D arrays for boxes and 1D arrays for scores and labels
     if len(final_boxes) > 0:
-        return torch.tensor(final_boxes), torch.tensor(final_scores), torch.tensor(final_labels)
+        return np.array(final_boxes), np.array(final_scores), np.array(final_labels)
     else:
-        return torch.empty((0, 4)), torch.empty(0), torch.empty(0, dtype=torch.long)
-
-    # If we don't have 2 kidneys, take the highest scoring remaining boxes
-    while len(final_boxes) < 2 and len(boxes) > len(final_boxes):
-        idx = len(final_boxes)
-        final_boxes.append(boxes[idx])
-        final_scores.append(scores[idx])
-        final_labels.append(labels[idx])
-
-    return torch.stack(final_boxes), torch.stack(final_scores), torch.stack(final_labels)
+        return np.empty((0, 4)), np.array([]), np.array([], dtype=int)
 
 def evaluate(model, data_loader, device, epoch):
     model.eval()
