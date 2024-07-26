@@ -382,53 +382,35 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     return avg_loss
 
 def create_model(args, num_classes, anchor_generator):
-    if args.backbone == 'resnet50':
-        weights = ResNet50_Weights.DEFAULT
-        backbone = resnet_fpn_backbone(backbone_name='resnet50', weights=weights, trainable_layers=3)
-    elif args.backbone == 'resnet101':
-        weights = ResNet101_Weights.DEFAULT
-        backbone = resnet_fpn_backbone(backbone_name='resnet101', weights=weights, trainable_layers=3)
-    elif args.backbone == 'resnet152':
-        weights = ResNet152_Weights.DEFAULT
-        backbone = resnet_fpn_backbone(backbone_name='resnet152', weights=weights, trainable_layers=3)
-    else:
-        raise ValueError("Unsupported backbone. Choose from 'resnet50', 'resnet101', or 'resnet152'.")
+    weights = ResNet50_Weights.DEFAULT
+    if args.backbone == 'resnet101': weights = ResNet101_Weights.DEFAULT
+    if args.backbone == 'resnet152': weights = ResNet152_Weights.DEFAULT
 
+    backbone = resnet_fpn_backbone(backbone_name=args.backbone, weights=weights, trainable_layers=3)
     model = FasterRCNN(backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
 
-    # Freeze layers up to layer3
     for name, parameter in model.backbone.body.named_parameters():
         if "layer4" not in name:
             parameter.requires_grad = False
         else:
-            parameter.requires_grad = True  # Ensure layer4 is trainable
-
-    print(f"Selected layers frozen for {args.backbone}.")
-
+            parameter.requires_grad = True
     return model
 
-def adjust_overlap_parameters(model, epoch):
-    # Define epochs at which parameters should be adjusted
-    if epoch <= 45:
-        if epoch % 15 == 0:  # Adjust parameters every 15 epochs
-            # Calculate new thresholds based on the current epoch
-            new_nms_thresh = 0.9 - (epoch / 45) * 0.4  # Example: decrease from 0.9 to 0.5
-            new_score_thresh = 0.05 + (epoch / 45) * 0.05  # Example: increase from 0.05 to 0.1
-            new_detections_per_img = 2  # Set to 2 as there are always exactly two kidneys
-
-            # Apply new thresholds
-            model.roi_heads.nms_thresh = new_nms_thresh
-            model.roi_heads.score_thresh = new_score_thresh
-            model.roi_heads.detections_per_img = new_detections_per_img
-            print(f"Adjusted parameters at epoch {epoch}: NMS Thresh={new_nms_thresh}, Score Thresh={new_score_thresh}, Detections per Img={new_detections_per_img}")
+def setup_environment(args):
+    if args.colab:
+        data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
+        checkpoint_dir = '/content/drive/MyDrive/MM/CatKidney/exps'
     else:
-        # Keep parameters steady after 45 epochs
-        model.roi_heads.nms_thresh = 0.5
-        model.roi_heads.score_thresh = 0.1
-        model.roi_heads.detections_per_img = 2  # Set to 2 as there are always exactly two kidneys
+        data_root = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-with-names'
+        checkpoint_dir = '/Users/ewern/Desktop/code/MetronMind/cat_exps'
+    
+    if args.colab:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    else:
+        device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+    return data_root, checkpoint_dir, device
 
-def main():
-    global use_wandb, use_colab
+def parse_arguments():
     parser = argparse.ArgumentParser(description='Train Cat Kidney Detection Model')
     parser.add_argument('--wandb', action='store_true', help='Use Weights & Biases for logging')
     parser.add_argument('--colab', action='store_true', help='Use Google Colab data path')
@@ -440,7 +422,20 @@ def main():
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
     parser.add_argument('--learning_rate', type=float, default=2e-4, help='Learning rate for training')
     parser.add_argument('--no_sweep', action='store_true', help='Disable wandb sweep and use specified hyperparameters')
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    global use_wandb, use_colab
+
+    args = parse_arguments()
+
+    # Hyperparameters
+    num_classes = 3  # Background (0), left kidney (1), right kidney (2)
+    num_epochs = 300
+    batch_size = args.batch_size
+    learning_rate = args.learning_rate
+    min_lr = args.learning_rate / 50
+    data_root, checkpoint_dir, device = setup_environment(args)
 
     use_wandb = args.wandb
     use_colab = args.colab
@@ -448,24 +443,8 @@ def main():
 
     if use_wandb:
         wandb.init(project="feline_kidney_detection", config=args)
-
-    # Paths
-    if use_colab:
-        data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
-        checkpoint_dir = '/content/drive/MyDrive/MM/CatKidney/exps'
-    else:
-        data_root = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-with-names'
-        checkpoint_dir = '/Users/ewern/Desktop/code/MetronMind/cat_exps'
-    
-    train_ann_file = os.path.join(data_root, 'COCO_2/train_Data_coco_format.json')
-    val_ann_file = os.path.join(data_root, 'COCO_2/val_Data_coco_format.json')
-
-    # Hyperparameters
-    num_classes = 3  # Background (0), left kidney (1), right kidney (2)
-    num_epochs = 500  # Set to 300 epochs
-    batch_size = args.batch_size
-    learning_rate = args.learning_rate
-    min_lr = args.learning_rate / 50
+    if only_10:
+        num_epochs = min(num_epochs, 10)  # Limit to 10 epochs for quick testing
 
     if use_wandb and not args.no_sweep:
         learning_rate = wandb.config.learning_rate
@@ -474,13 +453,12 @@ def main():
         args.aspect_ratios = wandb.config.aspect_ratios
 
     print("Initializing datasets...")
+    train_ann_file = os.path.join(data_root, 'COCO_2/train_Data_coco_format.json')
+    val_ann_file = os.path.join(data_root, 'COCO_2/val_Data_coco_format.json')
     train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=True, only_10=only_10)
     val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=True, only_10=only_10)
-    print("Datasets initialized.")
 
-    # Adjust num_epochs if only_10 is True
-    if only_10:
-        num_epochs = min(num_epochs, 10)  # Limit to 10 epochs for quick testing
+
     print("Creating data loaders...")
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, collate_fn=collate_fn)
@@ -488,7 +466,6 @@ def main():
 
     print("Creating model...")
     model = create_model(args, num_classes, None)  # Pass None for anchor_generator
-    print("Model created.")
 
     print("Modifying model parameters...")
     in_features = model.roi_heads.box_predictor.cls_score.in_features
@@ -515,11 +492,6 @@ def main():
         if 'backbone' in name:
             print(f"{name}: {param.requires_grad}")
 
-    if use_colab:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    else:
-        device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
-    
     print(f"Using device: {device}")
 
     print("Moving model to device...")
@@ -530,8 +502,7 @@ def main():
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.005)
 
-    # # Modified learning rate scheduler
-    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.8)
+    # learning rate scheduler
     lr_scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=min_lr)
 
 
@@ -560,7 +531,6 @@ def main():
 
     # In the training loop, replace the existing learning rate adjustment with this:
     for epoch in range(num_epochs):
-        adjust_overlap_parameters(model, epoch)  # Adjust model parameters based on the current epoch
 
         if epoch < warmup_epochs:
             # Linear warmup
@@ -639,10 +609,4 @@ def main():
         wandb.finish()
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        if use_wandb:
-            wandb.log({"error": str(e)})
-        print(f"An error occurred: {str(e)}")
-        raise
+    main()
