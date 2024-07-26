@@ -400,7 +400,7 @@ def create_model(args, num_classes):
 
     # Set the trainable layers
     for name, parameter in model.backbone.body.named_parameters():
-        if "layer4" not in name:
+        if "conv1" in name or "layer1" in name:
             parameter.requires_grad = False
         else:
             parameter.requires_grad = True
