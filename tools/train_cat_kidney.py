@@ -89,8 +89,7 @@ class CocoDataset(Dataset):
         return len(self.ids)
 
 def adjust_brightness(img):
-    brightness_factor = random.uniform(0.6, 1.4)
-    return TF.adjust_brightness(img, brightness_factor=brightness_factor)
+    return TF.adjust_brightness(img, brightness_factor=random.uniform(0.6, 1.4))
 
 def expand_channels(img):
     return img.repeat(3, 1, 1) if img.shape[0] == 1 else img
@@ -126,12 +125,9 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     """
     Visualize ground truth and predicted bounding boxes on the image and save it.
     """
-    # Debugging: Print shapes and types to understand the data structure at this point
-    print(f"pred_boxes type: {type(pred_boxes)}, shape: {pred_boxes.shape}")
     if pred_boxes.size == 0:
         print("No predicted boxes to visualize.")
         return
-    print(f"pred_labels type: {type(pred_labels)}, shape: {pred_labels.shape if hasattr(pred_labels, 'shape') else 'N/A'}")
 
     # Ensure pred_boxes and pred_labels are at least 2D and 1D respectively
     pred_boxes = np.atleast_2d(pred_boxes)
@@ -344,7 +340,6 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
 
     for batch_idx, (images, targets) in enumerate(data_loader):
         images = list(image.to(device) for image in images)
-        print(f"targets: {targets},\n\n type: {type(targets)}")
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         if use_amp:
