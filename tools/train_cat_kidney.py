@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from torchvision.transforms.functional import to_pil_image
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torchvision.models.detection import AnchorGenerator
+from torchvision.models.detection.rpn import AnchorGenerator
 import ast
 
 
@@ -229,7 +229,6 @@ def evaluate(model, data_loader, device, epoch):
             labels = output["labels"]
             
             # Apply the filtering
-            import code; code.interact(local=locals())
             boxes, scores, labels = filter_kidney_predictions(boxes, scores, labels)
             
             # Ensure boxes, scores, and labels are 2D arrays
@@ -375,7 +374,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
 
     return avg_loss
 
-import ast
+
 def parse_tuple(argument):
     try:
         return ast.literal_eval(argument)
@@ -389,9 +388,9 @@ def create_model(args, num_classes):
 
     backbone = resnet_fpn_backbone(backbone_name=args.backbone, weights=weights, trainable_layers=3)
 
-    # Parse the anchor sizes and aspect ratios from the command-line arguments
-    anchor_sizes = ast.literal_eval(args.anchor_sizes)
-    aspect_ratios = ast.literal_eval(args.aspect_ratios)
+    # Correctly parse the anchor sizes and aspect ratios from the command-line arguments
+    anchor_sizes = ((161,), (192,), (219,), (252,), (311,))
+    aspect_ratios = ((1.5, 2.0, 2.5),) * 5
 
     # Create a custom anchor generator if sizes and ratios are provided
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
@@ -400,7 +399,7 @@ def create_model(args, num_classes):
 
     # Set the trainable layers
     for name, parameter in model.backbone.body.named_parameters():
-        if "conv1" in name or "layer1" in name:
+        if "layer2" not in name and "layer3" not in name and "layer4" not in name:
             parameter.requires_grad = False
         else:
             parameter.requires_grad = True
@@ -445,8 +444,8 @@ def parse_arguments():
     parser.add_argument('--wandb', action='store_true', help='Use Weights & Biases for logging')
     parser.add_argument('--colab', action='store_true', help='Use Google Colab data path')
     parser.add_argument('--only_10', action='store_true', help='Use only 10 samples for quick testing')
-    parser.add_argument('--anchor_sizes', type=str, default="((161,), (192,), (219,), (252,), (311,))")
-    parser.add_argument('--aspect_ratios', type=str, default="((1.5, 2.0, 2.5),)")
+    # parser.add_argument('--anchor_sizes', type=str, default="((161,), (192,), (219,), (252,), (311,))")
+    # parser.add_argument('--aspect_ratios', type=str, default="((1.5, 2.0, 2.5),)")
     parser.add_argument('--backbone', type=str, default='resnet152', choices=['resnet50', 'resnet101', 'resnet152'],
                         help='Backbone architecture to use')
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
@@ -481,8 +480,8 @@ def main():
     if use_wandb and not args.no_sweep:
         learning_rate = wandb.config.learning_rate
         batch_size = wandb.config.batch_size
-        args.anchor_sizes = wandb.config.anchor_sizes
-        args.aspect_ratios = wandb.config.aspect_ratios
+        #args.anchor_sizes = wandb.config.anchor_sizes
+        #args.aspect_ratios = wandb.config.aspect_ratios
 
     print("Initializing datasets...")
     train_ann_file = os.path.join(data_root, 'COCO_2/train_Data_coco_format.json')
@@ -534,11 +533,11 @@ def main():
     best_mAP = 0.0
     best_epoch = -1
 
-    if use_wandb:
-        wandb.config.update({
-            "anchor_sizes": args.anchor_sizes,
-            "aspect_ratios": args.aspect_ratios
-        })
+    # if use_wandb:
+    #     wandb.config.update({
+    #         "anchor_sizes": args.anchor_sizes,
+    #         "aspect_ratios": args.aspect_ratios
+    #     })
 
     print(f"Validation dataset size: {len(val_dataset)}")
 
