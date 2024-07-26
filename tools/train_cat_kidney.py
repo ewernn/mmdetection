@@ -128,14 +128,10 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     """
     # Debugging: Print shapes and types to understand the data structure at this point
     print(f"pred_boxes type: {type(pred_boxes)}, shape: {pred_boxes.shape}")
-<<<<<<< Updated upstream
-    print(f"pred_labels type: {type(pred_labels)}, shape: {pred_labels.shape}")
-=======
     if pred_boxes.size == 0:
         print("No predicted boxes to visualize.")
         return
     print(f"pred_labels type: {type(pred_labels)}, shape: {pred_labels.shape if hasattr(pred_labels, 'shape') else 'N/A'}")
->>>>>>> Stashed changes
 
     # Ensure pred_boxes and pred_labels are at least 2D and 1D respectively
     pred_boxes = np.atleast_2d(pred_boxes)
@@ -148,12 +144,6 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     fig, ax = plt.subplots(1, figsize=(12, 8))
     ax.imshow(image_pil)
     
-<<<<<<< Updated upstream
-    # Ensure pred_labels is always a 1D array
-    pred_labels = np.atleast_1d(pred_labels)
-    
-=======
->>>>>>> Stashed changes
     # Draw ground truth boxes in green
     for box, label in zip(gt_boxes, gt_labels):
         rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
@@ -164,22 +154,12 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     # Draw predicted boxes in red
     if len(pred_boxes) > 0:
         for box, label in zip(pred_boxes, pred_labels):
-<<<<<<< Updated upstream
-            if len(box) == 4:  # Ensure box has 4 coordinates
-                rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
-                                         linewidth=2, edgecolor='r', facecolor='none')
-                ax.add_patch(rect)
-                ax.text(box[0], box[1]-20, f'Pred: {label}', color='r', fontsize=10, verticalalignment='top')
-            else:
-                print(f"Warning: Invalid box format: {box}")
-=======
             if box.shape[0] < 4:
                 print(f"Box shape error: {box.shape}")  # Print the shape of the problematic box
                 continue  # Skip if box does not have enough elements
             rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], linewidth=2, edgecolor='r', facecolor='none')
             ax.add_patch(rect)
             ax.text(box[0], box[1], f'Pred: {label}', color='r', fontsize=10, verticalalignment='top')
->>>>>>> Stashed changes
     else:
         ax.text(10, 10, 'No predictions', color='r', fontsize=12, verticalalignment='top')
     
@@ -402,26 +382,6 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     return avg_loss
 
 def create_model(args, num_classes, anchor_generator):
-<<<<<<< Updated upstream
-    if args.backbone in ['resnet101', 'resnet152']:
-        print(f"Using {args.backbone} as backbone")
-        weights = ResNet101_Weights.IMAGENET1K_V1 if args.backbone == 'resnet101' else ResNet152_Weights.IMAGENET1K_V1
-        backbone = resnet_fpn_backbone(backbone_name=args.backbone, weights=weights, trainable_layers=5)
-        
-        # For FPN backbones, we need 5 levels of anchor sizes
-        anchor_sizes = ((32,), (64,), (128,), (256,), (512,))
-        aspect_ratios = ((0.5, 1.0, 2.0),) * len(anchor_sizes)
-        anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
-        
-        model = FasterRCNN(backbone, num_classes=num_classes, 
-                           rpn_anchor_generator=anchor_generator)
-    else:
-        print("Using default ResNet-50 as backbone")
-        weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
-        model = fasterrcnn_resnet50_fpn(weights=weights, 
-                                        rpn_anchor_generator=anchor_generator)
-    
-=======
     if args.backbone == 'resnet50':
         weights = ResNet50_Weights.DEFAULT
         backbone = resnet_fpn_backbone(backbone_name='resnet50', weights=weights, trainable_layers=3)
@@ -445,7 +405,6 @@ def create_model(args, num_classes, anchor_generator):
 
     print(f"Selected layers frozen for {args.backbone}.")
 
->>>>>>> Stashed changes
     return model
 
 def adjust_overlap_parameters(model, epoch):
