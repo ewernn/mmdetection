@@ -473,7 +473,7 @@ def main():
     only_10 = args.only_10
 
     if use_wandb:
-        wandb.init(project="feline_kidney_detection", config=args)
+        wandb.init(project="kidney_detection", config=args)
     if only_10:
         num_epochs = min(num_epochs, 10)  # Limit to 10 epochs for quick testing
 
