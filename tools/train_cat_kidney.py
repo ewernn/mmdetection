@@ -424,6 +424,7 @@ def modify_model(model, num_classes):
     # Set pre_nms_top_n and post_nms_top_n
     model.rpn.pre_nms_top_n = lambda: 2000  # Decreased from 3000
     model.rpn.post_nms_top_n = lambda: 1000  # Decreased from 1500
+    return model
 
 def setup_environment(args):
     if args.colab:
@@ -497,7 +498,7 @@ def main():
     print("Data loaders created.")
 
     print("Creating model...")
-    model = create_model(args, num_classes, None)  # Pass None for anchor_generator
+    model = create_model(args, num_classes)
 
     print("Modifying model parameters...")
     model = modify_model(model, num_classes)
