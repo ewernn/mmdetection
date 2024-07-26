@@ -28,6 +28,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from torchvision.transforms.functional import to_pil_image
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from torchvision.models.detection import AnchorGenerator
+import ast
 
 
 # Initialize global variables
@@ -172,6 +174,8 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
 
 def filter_kidney_predictions(boxes, scores, labels, iou_threshold=0.5):
     # Convert to numpy for easier manipulation
+    print(f"type(boxes): {type(boxes)}, type(scores): {type(scores)}, type(labels): {type(labels)}")
+    print(f"boxes shape: {boxes.shape}, scores shape: {scores.shape}, labels shape: {labels.shape}")
     boxes = boxes.detach().cpu().numpy()
     scores = scores.detach().cpu().numpy()
     labels = labels.detach().cpu().numpy()
@@ -224,12 +228,8 @@ def evaluate(model, data_loader, device, epoch):
             scores = output["scores"]
             labels = output["labels"]
             
-            # Convert to numpy before filtering
-            boxes = boxes.detach().cpu().numpy()
-            scores = scores.detach().cpu().numpy()
-            labels = labels.detach().cpu().numpy()
-            
             # Apply the filtering
+            import code; code.interact(local=locals())
             boxes, scores, labels = filter_kidney_predictions(boxes, scores, labels)
             
             # Ensure boxes, scores, and labels are 2D arrays
@@ -244,7 +244,6 @@ def evaluate(model, data_loader, device, epoch):
             labels = labels[keep]
             
             if image_count < 5:
-                import code; code.interact(local=locals())
                 print(f"Image ID: {image_id}")
                 print(f"Number of detections after filtering: {len(boxes)}")
                 print(f"Scores: {scores}")
@@ -376,20 +375,55 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
 
     return avg_loss
 
-def create_model(args, num_classes, anchor_generator):
+import ast
+def parse_tuple(argument):
+    try:
+        return ast.literal_eval(argument)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError("Invalid tuple: %s" % (e,))
+
+def create_model(args, num_classes):
     weights = ResNet50_Weights.DEFAULT
     if args.backbone == 'resnet101': weights = ResNet101_Weights.DEFAULT
     if args.backbone == 'resnet152': weights = ResNet152_Weights.DEFAULT
 
     backbone = resnet_fpn_backbone(backbone_name=args.backbone, weights=weights, trainable_layers=3)
+
+    # Parse the anchor sizes and aspect ratios from the command-line arguments
+    anchor_sizes = ast.literal_eval(args.anchor_sizes)
+    aspect_ratios = ast.literal_eval(args.aspect_ratios)
+
+    # Create a custom anchor generator if sizes and ratios are provided
+    anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
+
     model = FasterRCNN(backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
 
+    # Set the trainable layers
     for name, parameter in model.backbone.body.named_parameters():
         if "layer4" not in name:
             parameter.requires_grad = False
         else:
             parameter.requires_grad = True
+
     return model
+
+def modify_model(model, num_classes):
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+
+    # Modify other RPN and ROI parameters
+    model.rpn.nms_thresh = 0.9  # Loosen from 0.5 to allow more overlap initially
+    model.rpn.fg_iou_thresh = 0.7  # Keep as is
+    model.rpn.bg_iou_thresh = 0.3  # Keep as is
+    model.roi_heads.batch_size_per_image = 256  # Keep as is
+    model.roi_heads.positive_fraction = 0.4  # Keep as is
+    model.roi_heads.score_thresh = 0.05  # Lowered from 0.1 to allow lower confidence detections
+    model.roi_heads.nms_thresh = 0.3  # Loosen from 0.3 to allow more overlap
+    model.roi_heads.detections_per_img = 10  # Increase from 2 to 10
+
+    # Set pre_nms_top_n and post_nms_top_n
+    model.rpn.pre_nms_top_n = lambda: 2000  # Decreased from 3000
+    model.rpn.post_nms_top_n = lambda: 1000  # Decreased from 1500
 
 def setup_environment(args):
     if args.colab:
@@ -417,6 +451,7 @@ def parse_arguments():
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
     parser.add_argument('--learning_rate', type=float, default=2e-4, help='Learning rate for training')
     parser.add_argument('--no_sweep', action='store_true', help='Disable wandb sweep and use specified hyperparameters')
+    parser.add_argument('--no_preload', action='store_true', help='Preload images into memory')
     return parser.parse_args()
 
 def main():
@@ -425,6 +460,7 @@ def main():
     args = parse_arguments()
 
     # Hyperparameters
+    eval_every_n_epochs = 1
     num_classes = 3  # Background (0), left kidney (1), right kidney (2)
     num_epochs = 300
     batch_size = args.batch_size
@@ -450,8 +486,9 @@ def main():
     print("Initializing datasets...")
     train_ann_file = os.path.join(data_root, 'COCO_2/train_Data_coco_format.json')
     val_ann_file = os.path.join(data_root, 'COCO_2/val_Data_coco_format.json')
-    train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=True, only_10=only_10)
-    val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=True, only_10=only_10)
+    preload = not args.no_preload
+    train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=preload, only_10=only_10)
+    val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=preload, only_10=only_10)
 
 
     print("Creating data loaders...")
@@ -463,29 +500,13 @@ def main():
     model = create_model(args, num_classes, None)  # Pass None for anchor_generator
 
     print("Modifying model parameters...")
-    in_features = model.roi_heads.box_predictor.cls_score.in_features
-    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-
-    # Modify other RPN and ROI parameters
-    model.rpn.nms_thresh = 0.9  # Loosen from 0.5 to allow more overlap initially
-    model.rpn.fg_iou_thresh = 0.7  # Keep as is
-    model.rpn.bg_iou_thresh = 0.3  # Keep as is
-    model.roi_heads.batch_size_per_image = 256  # Keep as is
-    model.roi_heads.positive_fraction = 0.4  # Keep as is
-    model.roi_heads.score_thresh = 0.05  # Lowered from 0.1 to allow lower confidence detections
-    model.roi_heads.nms_thresh = 0.3  # Loosen from 0.3 to allow more overlap
-    model.roi_heads.detections_per_img = 10  # Increase from 2 to 10
-
-    # Set pre_nms_top_n and post_nms_top_n
-    model.rpn.pre_nms_top_n = lambda: 2000  # Decreased from 3000
-    model.rpn.post_nms_top_n = lambda: 1000  # Decreased from 1500
-
-    print("Model parameters modified.")
+    model = modify_model(model, num_classes)
 
     print("Printing trainable status of layers:")
     for name, param in model.named_parameters():
-        if 'backbone' in name:
-            print(f"{name}: {param.requires_grad}")
+        # if 'backbone' in name:
+        #     print(f"{name}: {param.requires_grad}")
+        print(f"{name}: {param.requires_grad}")
 
     print(f"Using device: {device}")
 
@@ -543,7 +564,7 @@ def main():
         avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=50)
 
         # Evaluate on validation set every 5 epochs
-        if (epoch + 1) % 5 == 0:
+        if (epoch + 1) % eval_every_n_epochs == 0:
             metrics = evaluate(model, val_loader, device, epoch)
             mAP = metrics.get("mAP", 0.0)
             
