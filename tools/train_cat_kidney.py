@@ -10,32 +10,22 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from tqdm import tqdm
 import wandb
-import tools.utils as utils # Import your custom utils
 import sys
-import math  # Add this import
+import math
 import argparse
-import random  # Add this import
-import time  # Add this import
-from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2 as fasterrcnn_resnet50_fpn
-from torchvision.models.detection import FasterRCNN_ResNet50_FPN_V2_Weights as FasterRCNN_ResNet50_FPN_Weights
-from torchvision.models.detection import FasterRCNN
+import random
+import time
+from torchvision.models import ResNet101_Weights, ResNet152_Weights, ResNet50_Weights
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
+from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-from torchvision.models.detection.anchor_utils import AnchorGenerator
 from torch.cuda.amp import GradScaler, autocast	
-import torch.nn as nn
-from collections import OrderedDict
 import torchvision
-from torchvision.ops.feature_pyramid_network import LastLevelMaxPool
-import ast
-from torchvision.models import ResNet101_Weights, ResNet152_Weights
 import psutil
 import GPUtil
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from torchvision.utils import draw_bounding_boxes
-from torchvision.io import read_image
 from torchvision.transforms.functional import to_pil_image
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
@@ -55,10 +45,8 @@ class CocoDataset(Dataset):
         self.transforms = transforms
         self.preload = preload
         self.images = {}
-
         if self.preload:
             self._preload_images()
-
     def _preload_images(self):
         for img_id in self.ids:
             img_info = self.coco.loadImgs(img_id)[0]
@@ -73,12 +61,10 @@ class CocoDataset(Dataset):
         anns = coco.loadAnns(ann_ids)
         img_info = coco.loadImgs(img_id)[0]
         path = img_info['file_name']
-
         if self.preload:
             img = self.images[img_id]
         else:
             img = Image.open(os.path.join(self.root, path)).convert("L")  # Convert to grayscale
-
         num_objs = len(anns)
         boxes = []
         labels = []
@@ -87,24 +73,30 @@ class CocoDataset(Dataset):
             ymin = anns[i]['bbox'][1]
             xmax = xmin + anns[i]['bbox'][2]
             ymax = ymin + anns[i]['bbox'][3]
-            boxes.append([xmin, ymin, xmax, ymax])
+            boxes.append([xmin, ymin, xmax, ymax])  # go from (x1,y1,w,h) to (x1,y1,x2,y2)
             labels.append(anns[i]['category_id'])
-
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         labels = torch.as_tensor(labels, dtype=torch.int64)
-
         target = {}
         target["boxes"] = boxes
         target["labels"] = labels
         target["image_id"] = torch.tensor([img_id])  # Add image_id to target
-
         if self.transforms is not None:
             img = self.transforms(img)
-
         return img, target
-
+    
     def __len__(self):
         return len(self.ids)
+
+def adjust_brightness(img):
+    brightness_factor = random.uniform(0.6, 1.4)
+    return TF.adjust_brightness(img, brightness_factor=brightness_factor)
+
+def expand_channels(img):
+    return img.repeat(3, 1, 1) if img.shape[0] == 1 else img
+
+def adjust_contrast(img):
+    return TF.adjust_contrast(img, contrast_factor=random.uniform(0.5, 1.5))
 
 def get_transform(train):
     transforms = []
@@ -117,17 +109,14 @@ def get_transform(train):
                 scale=(0.9, 1.1),
                 fill=0
             ),
+            T.Lambda(adjust_brightness),
             T.RandomAutocontrast(p=0.5),
-            T.Lambda(lambda x: TF.adjust_brightness(x, brightness_factor=random.uniform(0.6, 1.4))),
-            T.Lambda(lambda x: TF.adjust_contrast(x, contrast_factor=random.uniform(0.5, 1.5))),
+            T.Lambda(adjust_contrast),
             T.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
             T.RandomAdjustSharpness(sharpness_factor=2, p=0.5),
-            #T.RandomHorizontalFlip(p=0.5),
         ])
-    
     # Expand grayscale to 3 channels
-    transforms.append(T.Lambda(lambda x: x.repeat(3, 1, 1) if x.shape[0] == 1 else x))
-    
+    transforms.append(T.Lambda(expand_channels))
     return T.Compose(transforms)
 
 def collate_fn(batch):
@@ -139,7 +128,18 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     """
     # Debugging: Print shapes and types to understand the data structure at this point
     print(f"pred_boxes type: {type(pred_boxes)}, shape: {pred_boxes.shape}")
+<<<<<<< Updated upstream
     print(f"pred_labels type: {type(pred_labels)}, shape: {pred_labels.shape}")
+=======
+    if pred_boxes.size == 0:
+        print("No predicted boxes to visualize.")
+        return
+    print(f"pred_labels type: {type(pred_labels)}, shape: {pred_labels.shape if hasattr(pred_labels, 'shape') else 'N/A'}")
+>>>>>>> Stashed changes
+
+    # Ensure pred_boxes and pred_labels are at least 2D and 1D respectively
+    pred_boxes = np.atleast_2d(pred_boxes)
+    pred_labels = np.atleast_1d(pred_labels)
 
     # Convert tensor image to PIL Image
     image_pil = to_pil_image(image)
@@ -148,9 +148,12 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     fig, ax = plt.subplots(1, figsize=(12, 8))
     ax.imshow(image_pil)
     
+<<<<<<< Updated upstream
     # Ensure pred_labels is always a 1D array
     pred_labels = np.atleast_1d(pred_labels)
     
+=======
+>>>>>>> Stashed changes
     # Draw ground truth boxes in green
     for box, label in zip(gt_boxes, gt_labels):
         rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
@@ -161,6 +164,7 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     # Draw predicted boxes in red
     if len(pred_boxes) > 0:
         for box, label in zip(pred_boxes, pred_labels):
+<<<<<<< Updated upstream
             if len(box) == 4:  # Ensure box has 4 coordinates
                 rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
                                          linewidth=2, edgecolor='r', facecolor='none')
@@ -168,6 +172,14 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
                 ax.text(box[0], box[1]-20, f'Pred: {label}', color='r', fontsize=10, verticalalignment='top')
             else:
                 print(f"Warning: Invalid box format: {box}")
+=======
+            if box.shape[0] < 4:
+                print(f"Box shape error: {box.shape}")  # Print the shape of the problematic box
+                continue  # Skip if box does not have enough elements
+            rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], linewidth=2, edgecolor='r', facecolor='none')
+            ax.add_patch(rect)
+            ax.text(box[0], box[1], f'Pred: {label}', color='r', fontsize=10, verticalalignment='top')
+>>>>>>> Stashed changes
     else:
         ax.text(10, 10, 'No predictions', color='r', fontsize=12, verticalalignment='top')
     
@@ -216,18 +228,16 @@ def evaluate(model, data_loader, device, epoch):
     model.eval()
     coco = data_loader.dataset.coco
     coco_results = []
-    
     # Create directory for saving images
     if use_colab:
         save_dir = f'/content/drive/MyDrive/MM/CatKidney/exps/imgs_out/epoch_{epoch}'
     else:
         save_dir = f'exps/images_with_predicted_bboxes/epoch_{epoch}'
     os.makedirs(save_dir, exist_ok=True)
-    
+    # loop thru eval set
     image_count = 0
-
     for images, targets in data_loader:
-        images = list(img.to(device) for img in images)
+        images = [img.to(device) for img in images]
         
         with torch.no_grad():
             outputs = model(images)
@@ -247,14 +257,9 @@ def evaluate(model, data_loader, device, epoch):
             boxes, scores, labels = filter_kidney_predictions(boxes, scores, labels)
             
             # Ensure boxes, scores, and labels are 2D arrays
-            if len(boxes) == 0:
-                boxes = np.empty((0, 4))
-                scores = np.array([])
-                labels = np.array([])
-            else:
-                boxes = np.atleast_2d(boxes)
-                scores = np.atleast_1d(scores)
-                labels = np.atleast_1d(labels)
+            boxes = np.atleast_2d(boxes)
+            scores = np.atleast_1d(scores)
+            labels = np.atleast_1d(labels)
             
             # Apply NMS
             keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.9)
@@ -263,6 +268,7 @@ def evaluate(model, data_loader, device, epoch):
             labels = labels[keep]
             
             if image_count < 5:
+                import code; code.interact(local=locals())
                 print(f"Image ID: {image_id}")
                 print(f"Number of detections after filtering: {len(boxes)}")
                 print(f"Scores: {scores}")
@@ -293,9 +299,6 @@ def evaluate(model, data_loader, device, epoch):
                         "bbox": [float(box[0]), float(box[1]), float(box[2] - box[0]), float(box[3] - box[1])],
                         "score": float(score),
                     })
-        
-        if image_count >= 5:
-            break
     
     print(f"Total number of results: {len(coco_results)}")
     
@@ -353,24 +356,32 @@ def evaluate(model, data_loader, device, epoch):
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     model.train()
-    scaler = GradScaler()
+    use_amp = device == 'cuda'  # Use automatic mixed precision only if CUDA is available
+    scaler = GradScaler(enabled=use_amp)
     total_loss = 0
     num_batches = 0
     start_time = time.time()
 
     for batch_idx, (images, targets) in enumerate(data_loader):
         images = list(image.to(device) for image in images)
+        print(f"targets: {targets},\n\n type: {type(targets)}")
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        with autocast():
+        if use_amp:
+            with autocast():
+                loss_dict = model(images, targets)
+                losses = sum(loss for loss in loss_dict.values())
+            scaler.scale(losses).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
+            optimizer.zero_grad()
+            losses.backward()
+            optimizer.step()
 
-        scaler.scale(losses).backward()
-        scaler.step(optimizer)
-        scaler.update()
-
-        optimizer.zero_grad()
+        optimizer.zero_grad()  # Ensure gradients are zeroed after each batch
         total_loss += losses.item()
         num_batches += 1
 
@@ -391,6 +402,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     return avg_loss
 
 def create_model(args, num_classes, anchor_generator):
+<<<<<<< Updated upstream
     if args.backbone in ['resnet101', 'resnet152']:
         print(f"Using {args.backbone} as backbone")
         weights = ResNet101_Weights.IMAGENET1K_V1 if args.backbone == 'resnet101' else ResNet152_Weights.IMAGENET1K_V1
@@ -409,6 +421,31 @@ def create_model(args, num_classes, anchor_generator):
         model = fasterrcnn_resnet50_fpn(weights=weights, 
                                         rpn_anchor_generator=anchor_generator)
     
+=======
+    if args.backbone == 'resnet50':
+        weights = ResNet50_Weights.DEFAULT
+        backbone = resnet_fpn_backbone(backbone_name='resnet50', weights=weights, trainable_layers=3)
+    elif args.backbone == 'resnet101':
+        weights = ResNet101_Weights.DEFAULT
+        backbone = resnet_fpn_backbone(backbone_name='resnet101', weights=weights, trainable_layers=3)
+    elif args.backbone == 'resnet152':
+        weights = ResNet152_Weights.DEFAULT
+        backbone = resnet_fpn_backbone(backbone_name='resnet152', weights=weights, trainable_layers=3)
+    else:
+        raise ValueError("Unsupported backbone. Choose from 'resnet50', 'resnet101', or 'resnet152'.")
+
+    model = FasterRCNN(backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
+
+    # Freeze layers up to layer3
+    for name, parameter in model.backbone.body.named_parameters():
+        if "layer4" not in name:
+            parameter.requires_grad = False
+        else:
+            parameter.requires_grad = True  # Ensure layer4 is trainable
+
+    print(f"Selected layers frozen for {args.backbone}.")
+
+>>>>>>> Stashed changes
     return model
 
 def adjust_overlap_parameters(model, epoch):
@@ -458,7 +495,7 @@ def main():
         data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
         checkpoint_dir = '/content/drive/MyDrive/MM/CatKidney/exps'
     else:
-        data_root = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset'
+        data_root = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-with-names'
         checkpoint_dir = '/Users/ewern/Desktop/code/MetronMind/cat_exps'
     
     train_ann_file = os.path.join(data_root, 'COCO_2/train_Data_coco_format.json')
