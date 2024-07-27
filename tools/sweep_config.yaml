@@ -1,25 +1,28 @@
 program: tools/train_cat_kidney.py
 method: grid
-name: feline_kidney_detection_sweep_v1
+name: feline_kidney_detection_sweep_v2
 command:
   - ${env}
   - python
   - ${program}
   - "--wandb"
   - "--colab"
+  - "--freeze_layers=${freeze_layers}"
   - ${args}
 parameters:
   learning_rate:
-    values: [1e-4, 1e-5]
-  anchor_sizes:
-    values:
-      - "((161,), (192,), (219,), (252,), (311,))"
-      - "((128,), (192,), (256,), (320,), (384,))"
-  aspect_ratios:
-    values:
-      - "((1.55, 1.97, 2.46),)"
-      - "((1.5, 2.0, 2.5),)"
-  backbone:
-    values: ["resnet101", "resnet152"]
-  batch_size:
-    values: [2, 4]
+    values: [1e-4]
+  freeze_layers:
+    values: ["", "layer1", "layer1,layer2"]
+  # anchor_sizes:
+  #   values:
+  #     - "((161,), (192,), (219,), (252,), (311,))"
+  #     - "((128,), (192,), (256,), (320,), (384,))"
+  # aspect_ratios:
+  #   values:
+  #     - "((1.55, 1.97, 2.46),)"
+  #     - "((1.5, 2.0, 2.5),)"
+  # backbone:
+  #   values: ["resnet101", "resnet152"]
+  # batch_size:
+  #   values: [2, 4]

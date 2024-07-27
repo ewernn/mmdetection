@@ -127,82 +127,72 @@ def visualize_boxes(image, gt_boxes, gt_labels, pred_boxes, pred_labels, image_i
     """
     Visualize ground truth and predicted bounding boxes on the image and save it.
     """
-    if pred_boxes.size == 0:
+
+    if pred_boxes.size(0) == 0:
         print("No predicted boxes to visualize.")
         return
 
-    # Ensure pred_boxes and pred_labels are at least 2D and 1D respectively
-    pred_boxes = np.atleast_2d(pred_boxes)
-    pred_labels = np.atleast_1d(pred_labels)
-
     # Convert tensor image to PIL Image
-    image_pil = to_pil_image(image)
+    image_pil = to_pil_image(image.cpu())
     
+    # Move tensors to CPU for visualization
+    gt_boxes = gt_boxes.cpu()
+    gt_labels = gt_labels.cpu()
+    pred_boxes = pred_boxes.cpu()
+    pred_labels = pred_labels.cpu()
+
     # Create figure and axis
     fig, ax = plt.subplots(1, figsize=(12, 8))
     ax.imshow(image_pil)
     
     # Draw ground truth boxes in green
     for box, label in zip(gt_boxes, gt_labels):
-        rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], 
-                                 linewidth=2, edgecolor='g', facecolor='none')
+        x, y, w, h = box[0].item(), box[1].item(), (box[2]-box[0]).item(), (box[3]-box[1]).item()
+        rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='g', facecolor='none')
         ax.add_patch(rect)
-        ax.text(box[0], box[1], f'GT: {label}', color='g', fontsize=10, verticalalignment='top')
+        ax.text(x, y, f'GT: {label.item()}', color='g', fontsize=10, verticalalignment='top')
     
     # Draw predicted boxes in red
     if len(pred_boxes) > 0:
         for box, label in zip(pred_boxes, pred_labels):
-            if box.shape[0] < 4:
-                print(f"Box shape error: {box.shape}")  # Print the shape of the problematic box
-                continue  # Skip if box does not have enough elements
-            rect = patches.Rectangle((box[0], box[1]), box[2]-box[0], box[3]-box[1], linewidth=2, edgecolor='r', facecolor='none')
+            x, y, w, h = box[0].item(), box[1].item(), (box[2]-box[0]).item(), (box[3]-box[1]).item()
+            rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='r', facecolor='none')
             ax.add_patch(rect)
-            ax.text(box[0], box[1], f'Pred: {label}', color='r', fontsize=10, verticalalignment='top')
+            ax.text(x, y, f'Pred: {label.item()}', color='r', fontsize=10, verticalalignment='top')
     else:
         ax.text(10, 10, 'No predictions', color='r', fontsize=12, verticalalignment='top')
     
-    # Remove axis ticks
     ax.set_xticks([])
     ax.set_yticks([])
-    
-    # Set title
     plt.title(f'Image ID: {image_id}')
-    
-    # Save the figure
     plt.savefig(save_path, bbox_inches='tight', dpi=300)
     plt.close(fig)
 
 def filter_kidney_predictions(boxes, scores, labels, iou_threshold=0.5):
-    # Convert to numpy for easier manipulation
-    print(f"type(boxes): {type(boxes)}, type(scores): {type(scores)}, type(labels): {type(labels)}")
-    print(f"boxes shape: {boxes.shape}, scores shape: {scores.shape}, labels shape: {labels.shape}")
-    boxes = boxes.detach().cpu().numpy()
-    scores = scores.detach().cpu().numpy()
-    labels = labels.detach().cpu().numpy()
+    '''
+    boxes has shape torch.tensor((10,4))
+    scores has shape torch.tensor((10,))
+    labels has shape torch.tensor((10,))
+    '''
+    # Check if there are no predictions
+    if boxes.shape[0] == 0:
+        return boxes, scores, labels
 
     # Create a dictionary to store the best prediction for each class
-    best_predictions = {}
+    best_indices = {}
 
-    for box, score, label in zip(boxes, scores, labels):
-        label = int(label)
-        if label not in best_predictions or score > best_predictions[label][1]:
-            best_predictions[label] = (box, score)
+    for i, (box, score, label) in enumerate(zip(boxes, scores, labels)):
+        label = label.item()
+        if label not in best_indices or score > scores[best_indices[label]]:
+            best_indices[label] = i
 
-    # Convert back to tensors
-    final_boxes = []
-    final_scores = []
-    final_labels = []
+    # Select the best predictions
+    best_indices = list(best_indices.values())
+    best_boxes = boxes[best_indices]
+    best_scores = scores[best_indices]
+    best_labels = labels[best_indices]
 
-    for label, (box, score) in best_predictions.items():
-        final_boxes.append(box)
-        final_scores.append(score)
-        final_labels.append(label)
-
-    # Ensure we always return 2D arrays for boxes and 1D arrays for scores and labels
-    if len(final_boxes) > 0:
-        return np.array(final_boxes), np.array(final_scores), np.array(final_labels)
-    else:
-        return np.empty((0, 4)), np.array([]), np.array([], dtype=int)
+    return best_boxes, best_scores, best_labels
 
 def evaluate(model, data_loader, device, epoch):
     model.eval()
@@ -222,50 +212,22 @@ def evaluate(model, data_loader, device, epoch):
         with torch.no_grad():
             outputs = model(images)
         
-        for i, (target, output) in enumerate(zip(targets, outputs)):
+        for i, (target, output) in enumerate(zip(targets, outputs)):  # for image 'i' in batch
             image_id = target["image_id"].item()
-            boxes = output["boxes"]
-            scores = output["scores"]
-            labels = output["labels"]
+            boxes = output["boxes"]  # tensor(10,4)
+            scores = output["scores"]  # tensor(10,)
+            labels = output["labels"]  # tensor(10,)
             
             # Apply the filtering
             boxes, scores, labels = filter_kidney_predictions(boxes, scores, labels)
             
-            # Ensure boxes, scores, and labels are 2D arrays
-            boxes = np.atleast_2d(boxes)
-            scores = np.atleast_1d(scores)
-            labels = np.atleast_1d(labels)
-            
-            # Apply NMS
-            keep = torchvision.ops.nms(torch.from_numpy(boxes), torch.from_numpy(scores), iou_threshold=0.9)
-            boxes = boxes[keep]
-            scores = scores[keep]
-            labels = labels[keep]
-            
-            if image_count < 5:
-                print(f"Image ID: {image_id}")
-                print(f"Number of detections after filtering: {len(boxes)}")
-                print(f"Scores: {scores}")
-                print(f"Labels: {labels}")
-                
-                # Print ground truth for comparison
-                gt_boxes = target["boxes"].cpu().numpy()
-                gt_labels = target["labels"].cpu().numpy()
-                print(f"Ground Truth - Number of objects: {len(gt_boxes)}")
-                print(f"Ground Truth - Labels: {gt_labels}")
-                
-                # Visualize and save image
-                image = images[i].cpu()  # Ensure the correct image is used
-                save_path = os.path.join(save_dir, f'image_{image_id}.png')
-                print(f"Visualizing Image ID: {image_id}, Save Path: {save_path}")
-                print(f"Image Shape: {image.shape}, GT Boxes: {gt_boxes}, GT Labels: {gt_labels}, Pred Boxes: {boxes}, Pred Labels: {labels}")
-                visualize_boxes(image, gt_boxes, gt_labels, boxes, labels, image_id, save_path)
-                
-                image_count += 1
-            
+            # # Apply NMS
+            # keep = torchvision.ops.nms(boxes, scores, iou_threshold=0.9);boxes = boxes[keep];scores = scores[keep];labels = labels[keep]
+
+            print(f"BEFORE COCO APPEND: boxes: {boxes}, scores: {scores}, labels: {labels}")
             if len(boxes) == 0 or len(scores) == 0 or len(labels) == 0:
                 print("No detections to process.")
-            else: # Your existing code
+            else:
                 for box, score, label in zip(boxes, scores, labels):
                     coco_results.append({
                         "image_id": image_id,
@@ -273,6 +235,15 @@ def evaluate(model, data_loader, device, epoch):
                         "bbox": [float(box[0]), float(box[1]), float(box[2] - box[0]), float(box[3] - box[1])],
                         "score": float(score),
                     })
+            
+            if image_count < 2:
+                print(f"\nImage ID: {image_id}  ||  # filtered detections: {len(boxes)}  ||  Scores: {scores}  ||  Labels: {labels}")
+                # Visualize and save image
+                save_path = os.path.join(save_dir, f'image_{image_id}.png')
+                print(f"Visualizing Image ID: {image_id}  ||  # filtered detections: {len(boxes)}  ||  Scores: {scores}  ||  Labels: {labels}  ||  Save Path: {'/'.join(save_path.split('/')[-4:])}")
+                print(f"GT Boxes: {target['boxes']}, GT Labels: {target['labels']}\nPred Boxes: {boxes}, Pred Labels: {labels}")
+                visualize_boxes(images[i], target["boxes"], target["labels"], boxes, labels, image_id, save_path)
+                image_count += 1
     
     print(f"Total number of results: {len(coco_results)}")
     
@@ -331,6 +302,7 @@ def evaluate(model, data_loader, device, epoch):
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     model.train()
     use_amp = device == 'cuda'  # Use automatic mixed precision only if CUDA is available
+    use_amp = device == 'cum'  # Use automatic mixed precision only if CUDA is available
     scaler = GradScaler(enabled=use_amp)
     total_loss = 0
     num_batches = 0
@@ -397,9 +369,11 @@ def create_model(args, num_classes):
 
     model = FasterRCNN(backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
 
-    # Set the trainable layers
+    # Set the trainable layers based on args.freeze_layers
     for name, parameter in model.backbone.body.named_parameters():
-        if "layer2" not in name and "layer3" not in name and "layer4" not in name:
+        if 'layer1' in name and 'freeze_layer1' in args.freeze_layers:
+            parameter.requires_grad = False
+        elif 'layer2' in name and 'freeze_layer2' in args.freeze_layers:
             parameter.requires_grad = False
         else:
             parameter.requires_grad = True
@@ -444,14 +418,13 @@ def parse_arguments():
     parser.add_argument('--wandb', action='store_true', help='Use Weights & Biases for logging')
     parser.add_argument('--colab', action='store_true', help='Use Google Colab data path')
     parser.add_argument('--only_10', action='store_true', help='Use only 10 samples for quick testing')
-    # parser.add_argument('--anchor_sizes', type=str, default="((161,), (192,), (219,), (252,), (311,))")
-    # parser.add_argument('--aspect_ratios', type=str, default="((1.5, 2.0, 2.5),)")
     parser.add_argument('--backbone', type=str, default='resnet152', choices=['resnet50', 'resnet101', 'resnet152'],
                         help='Backbone architecture to use')
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
     parser.add_argument('--learning_rate', type=float, default=2e-4, help='Learning rate for training')
     parser.add_argument('--no_sweep', action='store_true', help='Disable wandb sweep and use specified hyperparameters')
     parser.add_argument('--no_preload', action='store_true', help='Preload images into memory')
+    parser.add_argument('--freeze_layers', type=str, default='', help='Layers to freeze (comma-separated, e.g., "layer1,layer2")')
     return parser.parse_args()
 
 def main():
@@ -480,8 +453,6 @@ def main():
     if use_wandb and not args.no_sweep:
         learning_rate = wandb.config.learning_rate
         batch_size = wandb.config.batch_size
-        #args.anchor_sizes = wandb.config.anchor_sizes
-        #args.aspect_ratios = wandb.config.aspect_ratios
 
     print("Initializing datasets...")
     train_ann_file = os.path.join(data_root, 'COCO_2/train_Data_coco_format.json')
@@ -504,8 +475,6 @@ def main():
 
     print("Printing trainable status of layers:")
     for name, param in model.named_parameters():
-        # if 'backbone' in name:
-        #     print(f"{name}: {param.requires_grad}")
         print(f"{name}: {param.requires_grad}")
 
     print(f"Using device: {device}")
@@ -532,12 +501,6 @@ def main():
 
     best_mAP = 0.0
     best_epoch = -1
-
-    # if use_wandb:
-    #     wandb.config.update({
-    #         "anchor_sizes": args.anchor_sizes,
-    #         "aspect_ratios": args.aspect_ratios
-    #     })
 
     print(f"Validation dataset size: {len(val_dataset)}")
 
