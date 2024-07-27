@@ -5,8 +5,10 @@ command:
   - ${env}
   - python
   - ${program}
-  - "--wandb"
   - "--colab"
+  - "--backbone"
+  - "resnet152"
+  - "--wandb"
   - "--freeze_layers=${freeze_layers}"
   - ${args}
 parameters:
@@ -24,5 +26,5 @@ parameters:
   #     - "((1.5, 2.0, 2.5),)"
   # backbone:
   #   values: ["resnet101", "resnet152"]
-  # batch_size:
-  #   values: [2, 4]
+  batch_size:
+    values: [4]
