@@ -567,15 +567,23 @@ def main():
             if mAP == 0.0:
                 print("Warning: Model failed to detect any objects. Consider adjusting model parameters or checking the dataset.")
 
+            # if use_wandb:
+            #     # Log metrics
+            #     wandb.log({
+            #         "epoch": epoch + 1,
+            #         "avg_loss": avg_loss,
+            #         "learning_rate": current_lr,
+            #         "mAP": mAP
+            #     })
             if use_wandb:
-                # Log metrics
                 wandb.log({
                     "epoch": epoch + 1,
-                    "avg_loss": avg_loss,
+                    "training_loss": avg_loss,
                     "learning_rate": current_lr,
-                    "mAP": mAP
+                    "mAP": mAP,
+                    "AP_50": metrics["AP_50"],
+                    "AP_75": metrics["AP_75"],
                 })
-
             # Update best_mAP and best_epoch, and save model if it's the best so far
             if mAP > best_mAP:
                 best_mAP = mAP
