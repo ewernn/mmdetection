@@ -21,8 +21,6 @@ from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torch.cuda.amp import GradScaler, autocast	
 import torchvision
-import psutil
-import GPUtil
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -38,8 +36,8 @@ use_wandb = False
 use_colab = False
 
 class CocoDataset(Dataset):
-    def __init__(self, root, annFile, transforms=None, preload=False, only_10=False):
-        self.root = root
+    def __init__(self, root, annFile, transforms=None, preload=False, only_10=False, subfolder=''):
+        self.root = os.path.join(root, subfolder)  # Include subfolder in the path
         self.coco = COCO(annFile)
         self.ids = list(self.coco.imgs.keys())
         if only_10:
@@ -54,7 +52,7 @@ class CocoDataset(Dataset):
         for img_id in self.ids:
             img_info = self.coco.loadImgs(img_id)[0]
             path = img_info['file_name']
-            img = Image.open(os.path.join(self.root, path)).convert("L")  # Convert to grayscale
+            img = Image.open(os.path.join(self.root, path)).convert("L")  # Correct path with subfolder
             self.images[img_id] = img
 
     def __getitem__(self, index):
@@ -67,7 +65,7 @@ class CocoDataset(Dataset):
         if self.preload:
             img = self.images[img_id]
         else:
-            img = Image.open(os.path.join(self.root, path)).convert("L")  # Convert to grayscale
+            img = Image.open(os.path.join(self.root, path)).convert("L")  # Correct path with subfolder
         num_objs = len(anns)
         boxes = []
         labels = []
@@ -503,8 +501,8 @@ def main():
         train_ann_file = data_root + 'Train/only_with_bbox_Data_coco_format.json'
         val_ann_file = data_root + 'Test/only_with_bbox_Data_coco_format.json'
     preload = not args.no_preload
-    train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=preload, only_10=only_10)
-    val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=preload, only_10=only_10)
+    train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=preload, only_10=only_10, subfolder='Train')
+    val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=preload, only_10=only_10, subfolder='Test')
 
     print("Creating data loaders...")
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, collate_fn=collate_fn)
