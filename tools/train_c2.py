@@ -459,12 +459,12 @@ def main():
     args = parse_arguments()
 
     # Hyperparameters
-    eval_every_n_epochs = 4
+    eval_every_n_epochs = 2
     num_classes = 3  # Background (0), c2_vertebrae (1)
-    num_epochs = 100
+    num_epochs = 150
     batch_size = args.batch_size
     learning_rate = args.learning_rate
-    min_lr = args.learning_rate / 50
+    min_lr = args.learning_rate / 100
     data_root, checkpoint_dir, device = setup_environment(args)
     # data_root = '.../c2/data/'
 
