@@ -298,22 +298,6 @@ def evaluate(model, data_loader, device, epoch):
 
     return metrics
 
-def manual_gradient_clipping(parameters, max_norm):
-    total_norm = 0
-    for param in parameters:
-        if param.grad is not None:
-            param_norm = param.grad.data.norm(2)
-            total_norm += param_norm.item() ** 2
-    total_norm = total_norm ** 0.5
-
-    if total_norm > max_norm:
-        scale = max_norm / (total_norm + 1e-6)  # Adding a small epsilon to avoid division by zero
-        for param in parameters:
-            if param.grad is not None:
-                param.grad.data.mul_(scale)
-    
-    return total_norm
-
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, localization_weight=2.0, max_grad_norm=1.0):
     model.train()
     use_amp = device == 'cuda'  # Use automatic mixed precision only if CUDA is available
@@ -336,8 +320,8 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, lo
                 losses = sum(loss for loss in loss_dict.values())
             scaler.scale(losses).backward()
             # Calculate and log gradient norms
-            total_norm = manual_gradient_clipping(model.parameters(), max_grad_norm)
-            print(f"Epoch {epoch}, Batch {batch_idx}, Gradient Norm: {total_norm:.4f}")
+            # total_norm = manual_gradient_clipping(model.parameters(), max_grad_norm)
+            # print(f"Epoch {epoch}, Batch {batch_idx}, Gradient Norm: {total_norm:.4f}")
             scaler.step(optimizer)
             scaler.update()
         else:
@@ -351,16 +335,16 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, lo
             optimizer.zero_grad()
             losses.backward()
             parameters = list(model.parameters())
-            total_norm_before = manual_gradient_clipping(parameters, float('inf'))
-            total_norm = manual_gradient_clipping(parameters, max_grad_norm)
+            # total_norm_before = manual_gradient_clipping(parameters, float('inf'))
+            # total_norm = manual_gradient_clipping(parameters, max_grad_norm)
             # Calculate and log gradient norms before clipping
             #total_norm_before = manual_gradient_clipping(model.parameters(), float('inf'))
-            print(f"Total norm before clipping: {total_norm_before:.4f}")
+            # print(f"Total norm before clipping: {total_norm_before:.4f}")
             # Apply gradient clipping
-            print(f"max_grad_norm: {max_grad_norm}")
-            print(f"model.parameters(): {model.parameters()}")
+            # print(f"max_grad_norm: {max_grad_norm}")
+            # print(f"model.parameters(): {model.parameters()}")
             #total_norm = manual_gradient_clipping(model.parameters(), max_grad_norm)
-            print(f"Total norm after clipping: {total_norm:.4f}")
+            # print(f"Total norm after clipping: {total_norm:.4f}")
             optimizer.step()
 
         optimizer.zero_grad()  # Ensure gradients are zeroed after each batch
@@ -398,8 +382,8 @@ def create_model(args, num_classes):
     backbone = resnet_fpn_backbone(backbone_name=args.backbone, weights=weights, trainable_layers=3)
 
     # AnchorGenerator
-    anchor_sizes = ((161,), (192,), (219,), (252,), (311,))
-    aspect_ratios = ((1.5, 2.0, 2.5),) * 5
+    anchor_sizes = ((317, 428), (432, 528), (506, 536), (579, 544), (687, 543))
+    aspect_ratios = ((0.5, 0.9, 1.0, 1.4),) * 5
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
 
     model = FasterRCNN(backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
@@ -421,17 +405,17 @@ def modify_model(model, num_classes):
 
     # Modify other RPN and ROI parameters
     model.rpn.nms_thresh = 0.8  # increase from 0.5 to allow less overlap
-    model.rpn.fg_iou_thresh = 0.8  # changed from .8
-    model.rpn.bg_iou_thresh = 0.2  # Keep as is
+    model.rpn.fg_iou_thresh = 0.6  # changed from .8
+    model.rpn.bg_iou_thresh = 0.3  # changed from .3
     model.roi_heads.batch_size_per_image = 256  # Keep as is
     model.roi_heads.positive_fraction = 0.5  # Keep as is
-    model.roi_heads.score_thresh = 0.5  # Lowered from 0.1 to allow lower confidence detections
-    model.roi_heads.nms_thresh = 0.3  # Loosen from 0.3 to allow more overlap
+    model.roi_heads.score_thresh = 0.3  # Lowered from 0.1 to allow lower confidence detections
+    model.roi_heads.nms_thresh = 0.4  # tighten from 0.3 to allow less overlap
     model.roi_heads.detections_per_img = 4  # Increase from 2 to 10
 
     # Set pre_nms_top_n and post_nms_top_n
-    model.rpn.pre_nms_top_n = lambda: 200  # Decreased from 3000
-    model.rpn.post_nms_top_n = lambda: 20  # Decreased from 1500
+    model.rpn.pre_nms_top_n = lambda: 300  # Decreased from 3000
+    model.rpn.post_nms_top_n = lambda: 50  # Decreased from 1500
     return model
 
 def load_checkpoint(filepath, model, optimizer):

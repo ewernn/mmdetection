@@ -5,18 +5,18 @@ from PIL import Image
 import os
 
 # Read the CSV file
-df = pd.read_csv('/Users/ewern/Downloads/wetransfer_test-zip_2024-07-27_1944/Test/Data.csv')
+df = pd.read_csv('/Users/ewern/Desktop/code/MetronMind/c2/data/Train/Data.csv')
 
 # Convert columns to float, handling non-numeric values
 df[['x1', 'y1', 'x2', 'y2']] = df[['x1', 'y1', 'x2', 'y2']].apply(pd.to_numeric, errors='coerce')
 
 # Directory to save output images
-output_dir = '/Users/ewern/Downloads/C2_imgs_out'
+output_dir = '/Users/ewern/Downloads/C2_imgs_out_train'
 os.makedirs(output_dir, exist_ok=True)
 
 # Function to draw bounding boxes and save images
 def save_annotated_images(row):
-    image_path = f"/Users/ewern/Downloads/wetransfer_test-zip_2024-07-27_1944/Test/{row['Image']}"  # Adjust path as necessary
+    image_path = f"/Users/ewern/Desktop/code/MetronMind/c2/data/Train/{row['Image']}"  # Adjust path as necessary
     if not pd.isna(row['x1']):
         img = Image.open(image_path).convert('L')  # Convert image to grayscale
         fig, ax = plt.subplots()
@@ -34,5 +34,5 @@ def save_annotated_images(row):
         plt.close()
 
 # Apply the function to each row in the dataframe
-# df.apply(save_annotated_images, axis=1)
+#df.apply(save_annotated_images, axis=1)
 print(df.head(15))

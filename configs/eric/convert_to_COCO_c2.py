@@ -6,6 +6,11 @@ from sklearn.model_selection import train_test_split
 
 def create_coco_format(data_csv_path, images_dir, output_json_path, dataset_type, include_all_images=True):
     df = pd.read_csv(data_csv_path)
+    # Convert x1, y1, x2, y2 to numeric, coercing errors to NaN
+    for col in ['x1', 'y1', 'x2', 'y2']:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+    # Clamping x1, y1, x2, y2 to be within [0.0, 1.0]
+    df[['x1', 'y1', 'x2', 'y2']] = df[['x1', 'y1', 'x2', 'y2']].clip(lower=0.0, upper=1.0)
     df['has_bbox'] = df[['x1', 'y1', 'x2', 'y2']].notna().all(axis=1)
     
     if not include_all_images:
@@ -80,10 +85,12 @@ def create_coco_format(data_csv_path, images_dir, output_json_path, dataset_type
 
     print(f"Created COCO format for {subset_name}: {subset_output_path}")
 
+    print(f"Created COCO format for {subset_name}: {subset_output_path}")
+
 # Usage
 data_paths = [
-    ('Test', '/Users/ewern/Downloads/wetransfer_test-zip_2024-07-27_1944/Test/Data.csv', '/Users/ewern/Downloads/wetransfer_test-zip_2024-07-27_1944/Test'),
-    ('Train', '/Users/ewern/Downloads/wetransfer_test-zip_2024-07-27_1944/Train/Data.csv', '/Users/ewern/Downloads/wetransfer_test-zip_2024-07-27_1944/Train')
+    ('Test', '/Users/ewern/Desktop/code/MetronMind/c2/data/Test/Data.csv', '/Users/ewern/Desktop/code/MetronMind/c2/data/Test/'),
+    ('Train', '/Users/ewern/Desktop/code/MetronMind/c2/data/Train/Data.csv', '/Users/ewern/Desktop/code/MetronMind/c2/data/Train/')
 ]
 output_json_path = '/Users/ewern/Desktop/code/MetronMind/c2/data/c2_coco_format'
 
