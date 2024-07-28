@@ -9,8 +9,9 @@ command:
   - "--backbone"
   - "resnet152"
   - "--wandb"
-  - "--freeze_layers=${freeze_layers}"
+  - "--freeze_layers=layer1"
   - ${args}
+  #- "--freeze_layers=${freeze_layers}"
 parameters:
   learning_rate:
     values: [1e-4]

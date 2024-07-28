@@ -201,9 +201,9 @@ def evaluate(model, data_loader, device, epoch):
     coco_results = []
     # Create directory for saving images
     if use_colab:
-        save_dir = f'/content/drive/MyDrive/MM/CatKidney/exps/imgs_out/epoch_{epoch}'
+        save_dir = f'/content/drive/MyDrive/MM/c2/exps/imgs_out/epoch_{epoch}'
     else:
-        save_dir = f'exps/images_with_predicted_bboxes/epoch_{epoch}'
+        save_dir = f'/Users/ewern/Desktop/code/MetronMind/c2/exps/imgs_out/epoch_{epoch}'
     os.makedirs(save_dir, exist_ok=True)
     # loop thru eval set
     image_count = 0
@@ -446,30 +446,29 @@ def load_checkpoint(filepath, model, optimizer):
 
 def setup_environment(args):
     if args.colab:
-        data_root = '/content/drive/MyDrive/MM/CatKidney/data/cat-dataset/'
-        checkpoint_dir = '/content/drive/MyDrive/MM/CatKidney/exps'
-    else:
-        data_root = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset-with-names'
-        checkpoint_dir = '/Users/ewern/Desktop/code/MetronMind/cat_exps'
-    
-    if args.colab:
+        c2 = '/content/drive/MyDrive/MM/c2/'
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
+        c2 = '/Users/ewern/Desktop/code/MetronMind/c2/'
         device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
-    return data_root, checkpoint_dir, device
+    data_root = c2 + 'data/'
+    chkpt_dir = c2 + 'exps/'
+    
+    return data_root, chkpt_dir, device
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Train Cat Kidney Detection Model')
+    parser = argparse.ArgumentParser(description='Train C2 Detection Model')
     parser.add_argument('--wandb', action='store_true', help='Use Weights & Biases for logging')
     parser.add_argument('--colab', action='store_true', help='Use Google Colab data path')
     parser.add_argument('--only_10', action='store_true', help='Use only 10 samples for quick testing')
     parser.add_argument('--backbone', type=str, default='resnet152', choices=['resnet50', 'resnet101', 'resnet152'],
                         help='Backbone architecture to use')
     parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
-    parser.add_argument('--learning_rate', type=float, default=1e-5, help='Learning rate for training')
+    parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate for training')
     parser.add_argument('--no_sweep', action='store_true', help='Disable wandb sweep and use specified hyperparameters')
     parser.add_argument('--no_preload', action='store_true', help='Preload images into memory')
     parser.add_argument('--freeze_layers', type=str, default='', help='Layers to freeze (comma-separated, e.g., "layer1,layer2")')
+    parser.add_argument('--all_images', action='store_true', help='use all images in dataloaders (including NaN entries)')
     return parser.parse_args()
 
 def main():
@@ -479,12 +478,13 @@ def main():
 
     # Hyperparameters
     eval_every_n_epochs = 4
-    num_classes = 3  # Background (0), left kidney (1), right kidney (2)
-    num_epochs = 300
+    num_classes = 3  # Background (0), c2_vertebrae (1)
+    num_epochs = 100
     batch_size = args.batch_size
     learning_rate = args.learning_rate
     min_lr = args.learning_rate / 50
     data_root, checkpoint_dir, device = setup_environment(args)
+    # data_root = '.../c2/data/'
 
     use_wandb = args.wandb
     use_colab = args.colab
@@ -496,8 +496,12 @@ def main():
         num_epochs = min(num_epochs, 10)  # Limit to 10 epochs for quick testing
 
     print("Initializing datasets...")
-    train_ann_file = os.path.join(data_root, 'COCO_2/train_Data_coco_format.json')
-    val_ann_file = os.path.join(data_root, 'COCO_2/val_Data_coco_format.json')
+    if args.all_images:
+        train_ann_file = data_root + 'Train/all_images_Data_coco_format.json'
+        val_ann_file = data_root + 'Test/all_images_Data_coco_format.json'
+    else:
+        train_ann_file = data_root + 'Train/only_with_bbox_Data_coco_format.json'
+        val_ann_file = data_root + 'Test/only_with_bbox_Data_coco_format.json'
     preload = not args.no_preload
     train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=preload, only_10=only_10)
     val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=preload, only_10=only_10)
@@ -528,7 +532,7 @@ def main():
     optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.05)
 
     # Load checkpoint if it exists
-    checkpoint_path = '/content/drive/MyDrive/MM/CatKidney/exps/model_epoch40/best_model.pth'
+    checkpoint_path = '/content/drive/MyDrive/MM/CatKidney/exps/model_epoch40/best_model/hob_knob.pt'
     if os.path.exists(checkpoint_path):
         print(f"Loading checkpoint from {checkpoint_path}")
         model, optimizer, start_epoch, best_mAP = load_checkpoint(checkpoint_path, model, optimizer)
