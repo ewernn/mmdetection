@@ -383,7 +383,7 @@ def create_model(args, num_classes):
 
     # AnchorGenerator
     anchor_sizes = ((317, 428), (432, 528), (506, 536), (579, 544), (687, 543))
-    aspect_ratios = ((0.5, 0.9, 1.0, 1.4),) * 5
+    aspect_ratios = ((0.5, 0.9, 1.0, 1.2, 1.4, 1.8),) * 5
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
 
     model = FasterRCNN(backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
@@ -405,17 +405,17 @@ def modify_model(model, num_classes):
 
     # Modify other RPN and ROI parameters
     model.rpn.nms_thresh = 0.8  # increase from 0.5 to allow less overlap
-    model.rpn.fg_iou_thresh = 0.6  # changed from .8
+    model.rpn.fg_iou_thresh = 0.75  # changed from .8
     model.rpn.bg_iou_thresh = 0.3  # changed from .3
     model.roi_heads.batch_size_per_image = 256  # Keep as is
     model.roi_heads.positive_fraction = 0.5  # Keep as is
-    model.roi_heads.score_thresh = 0.3  # Lowered from 0.1 to allow lower confidence detections
-    model.roi_heads.nms_thresh = 0.4  # tighten from 0.3 to allow less overlap
-    model.roi_heads.detections_per_img = 4  # Increase from 2 to 10
+    model.roi_heads.score_thresh = 0.3  # Lowered from 0.5 to allow lower confidence detections
+    model.roi_heads.nms_thresh = 0.3  # tighten from 0.3 to allow less overlap
+    model.roi_heads.detections_per_img = 6  # Increase from 2 to 10
 
     # Set pre_nms_top_n and post_nms_top_n
-    model.rpn.pre_nms_top_n = lambda: 300  # Decreased from 3000
-    model.rpn.post_nms_top_n = lambda: 50  # Decreased from 1500
+    model.rpn.pre_nms_top_n = lambda: 200  # Decreased from 3000
+    model.rpn.post_nms_top_n = lambda: 40  # Decreased from 1500
     return model
 
 def load_checkpoint(filepath, model, optimizer):
@@ -461,7 +461,7 @@ def main():
     # Hyperparameters
     eval_every_n_epochs = 2
     num_classes = 3  # Background (0), c2_vertebrae (1)
-    num_epochs = 150
+    num_epochs = 80
     batch_size = args.batch_size
     learning_rate = args.learning_rate
     min_lr = args.learning_rate / 100
