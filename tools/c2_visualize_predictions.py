@@ -85,7 +85,8 @@ def main(model_path, coco_path, img_dir, save_dir, device):
     for img_id in img_ids:
         img_info = coco.loadImgs(img_id)[0]
         path = img_info['file_name']
-        image = Image.open(os.path.join(img_dir, path)).convert("RGB")
+        image = Image.open(os.path.join(img_dir, path)).convert("L")  # Convert image to grayscale
+        image = image.convert("RGB")  # Convert grayscale image to RGB by replicating channels
         image_tensor = torch.from_numpy(np.array(image)).permute(2, 0, 1).float().div(255).unsqueeze(0).to(device)
 
         ann_ids = coco.getAnnIds(imgIds=img_id)
