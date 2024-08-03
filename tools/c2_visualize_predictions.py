@@ -31,7 +31,7 @@ def create_model(device, num_classes):
     model.rpn.bg_iou_thresh = 0.3
     model.roi_heads.batch_size_per_image = 256
     model.roi_heads.positive_fraction = 0.5
-    model.roi_heads.score_thresh = 0.9
+    model.roi_heads.score_thresh = 0.85
     model.roi_heads.nms_thresh = 0.4
     model.roi_heads.detections_per_img = 4
 

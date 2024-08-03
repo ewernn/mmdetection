@@ -95,7 +95,7 @@ def expand_channels(img):
     return img.repeat(3, 1, 1) if img.shape[0] == 1 else img
 
 def adjust_contrast(img):
-    return TF.adjust_contrast(img, contrast_factor=random.uniform(0.5, 1.5))
+    return TF.adjust_contrast(img, contrast_factor=random.uniform(0.3, 1.7))
 
 def get_transform(train):
     transforms = []
@@ -104,7 +104,7 @@ def get_transform(train):
         transforms.extend([
             T.RandomHorizontalFlip(p=0.5),  # Add horizontal flip with 50% probability
             T.RandomAffine(
-                degrees=(-20, 20),
+                degrees=(-30, 30),
                 translate=(0.1, 0.1),
                 scale=(0.9, 1.1),
                 fill=0
@@ -117,7 +117,6 @@ def get_transform(train):
         ])
     # Expand grayscale to 3 channels
     transforms.append(T.Lambda(expand_channels))
-    return T.Compose(transforms)
     return T.Compose(transforms)
 
 def collate_fn(batch):
@@ -383,8 +382,19 @@ def create_model(args, num_classes):
     backbone = resnet_fpn_backbone(backbone_name=args.backbone, weights=weights, trainable_layers=3)
 
     # AnchorGenerator
-    anchor_sizes = ((317, 428), (432, 528), (506, 536), (579, 544), (687, 543))
-    aspect_ratios = ((0.5, 0.9, 1.0, 1.2, 1.4, 1.8),) * 5
+    # anchor_sizes = ((317, 428), (432, 528), (506, 536), (579, 544), (687, 543))
+    # aspect_ratios = ((0.5, 0.9, 1.0, 1.2, 1.4, 1.8),) * 5
+    anchor_sizes = (
+        (200, 400),   # Small objects
+        (300, 500),   # Medium-small objects
+        (400, 600),   # Medium objects
+        (500, 700),   # Medium-large objects
+        (600, 800),   # Large objects
+    )
+    aspect_ratios = (
+        (0.5, 0.75, 0.9, 1.1, 1.25, 1.5, 1.85, 2.5),
+    ) * len(anchor_sizes)
+    
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
 
     model = FasterRCNN(backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
