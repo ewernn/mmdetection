@@ -89,8 +89,8 @@ def create_coco_format(data_csv_path, images_dir, output_json_path, dataset_type
 
 # Usage
 data_paths = [
-    ('Test', '/Users/ewern/Desktop/code/MetronMind/c2/data/Test/Data.csv', '/Users/ewern/Desktop/code/MetronMind/c2/data/Test/'),
-    ('Train', '/Users/ewern/Desktop/code/MetronMind/c2/data/Train/Data.csv', '/Users/ewern/Desktop/code/MetronMind/c2/data/Train/')
+    ('Test', '/Users/ewern/Desktop/code/MetronMind/c2/data/Test/Data_updated.csv', '/Users/ewern/Desktop/code/MetronMind/c2/data/Test/'),
+    ('Train', '/Users/ewern/Desktop/code/MetronMind/c2/data/Train/Data_updated.csv', '/Users/ewern/Desktop/code/MetronMind/c2/data/Train/')
 ]
 output_json_path = '/Users/ewern/Desktop/code/MetronMind/c2/data/c2_coco_format'
 

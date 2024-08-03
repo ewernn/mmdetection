@@ -31,7 +31,7 @@ def create_model(device, num_classes):
     model.rpn.bg_iou_thresh = 0.3
     model.roi_heads.batch_size_per_image = 256
     model.roi_heads.positive_fraction = 0.5
-    model.roi_heads.score_thresh = 0.3
+    model.roi_heads.score_thresh = 0.9
     model.roi_heads.nms_thresh = 0.4
     model.roi_heads.detections_per_img = 4
 
@@ -50,7 +50,7 @@ def get_dataset(coco_path, img_dir):
     img_ids = coco.getImgIds()
     return coco, img_ids
 
-def visualize_and_save(image, gt_boxes, pred_boxes, image_id, save_dir):
+def visualize_and_save(image, gt_boxes, pred_boxes, pred_scores, image_id, save_dir):
     # Convert tensor image to PIL Image
     image_pil = to_pil_image(image.cpu())
 
@@ -60,13 +60,20 @@ def visualize_and_save(image, gt_boxes, pred_boxes, image_id, save_dir):
 
     # Draw ground truth boxes in green
     for box in gt_boxes:
-        rect = patches.Rectangle((box[0], box[1]), box[2] - box[0], box[3] - box[1], linewidth=2, edgecolor='g', facecolor='none')
+        x_min, y_min, width, height = box
+        x_max = x_min + width
+        y_max = y_min + height
+        rect = patches.Rectangle((x_min, y_min), width, height, linewidth=2, edgecolor='g', facecolor='none')
         ax.add_patch(rect)
 
-    # Draw predicted boxes in red
-    for box in pred_boxes:
-        rect = patches.Rectangle((box[0], box[1]), box[2] - box[0], box[3] - box[1], linewidth=2, edgecolor='r', facecolor='none')
+    # Draw predicted boxes in red and display scores
+    for box, score in zip(pred_boxes, pred_scores):
+        x_min, y_min, x_max, y_max = box
+        width = x_max - x_min
+        height = y_max - y_min
+        rect = patches.Rectangle((x_min, y_min), width, height, linewidth=2, edgecolor='r', facecolor='none')
         ax.add_patch(rect)
+        ax.text(x_min, y_min, f'{score:.2f}', color='red', fontsize=10, verticalalignment='top', backgroundcolor='white')
 
     ax.set_xticks([])
     ax.set_yticks([])
@@ -92,12 +99,13 @@ def main(model_path, coco_path, img_dir, save_dir, device):
         ann_ids = coco.getAnnIds(imgIds=img_id)
         anns = coco.loadAnns(ann_ids)
         gt_boxes = [ann['bbox'] for ann in anns]  # [x, y, width, height]
-
+        model.to(device)
         with torch.no_grad():
             prediction = model(image_tensor)[0]
 
         pred_boxes = prediction['boxes'].cpu().numpy()
-        visualize_and_save(image_tensor.squeeze(0), gt_boxes, pred_boxes, img_id, save_dir)
+        pred_scores = prediction['scores'].cpu().numpy()
+        visualize_and_save(image_tensor.squeeze(0), gt_boxes, pred_boxes, pred_scores, img_id, save_dir)
 
 if __name__ == "__main__":
     c2 = '/Users/ewern/Desktop/code/MetronMind/c2/'

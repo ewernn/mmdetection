@@ -30,7 +30,6 @@ from torchvision.models.detection.rpn import AnchorGenerator
 import ast
 from torch.nn.utils import clip_grad_norm_
 
-
 # Initialize global variables
 use_wandb = False
 use_colab = False
@@ -103,6 +102,7 @@ def get_transform(train):
     transforms.append(T.ToTensor())
     if train:
         transforms.extend([
+            T.RandomHorizontalFlip(p=0.5),  # Add horizontal flip with 50% probability
             T.RandomAffine(
                 degrees=(-20, 20),
                 translate=(0.1, 0.1),
@@ -117,6 +117,7 @@ def get_transform(train):
         ])
     # Expand grayscale to 3 channels
     transforms.append(T.Lambda(expand_channels))
+    return T.Compose(transforms)
     return T.Compose(transforms)
 
 def collate_fn(batch):
