@@ -424,8 +424,8 @@ def load_checkpoint(filepath, model, optimizer):
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch']
-    mAP = checkpoint.get('mAP', None)
-    return model, optimizer, epoch, mAP
+    best_mAP = checkpoint.get('best_mAP', 0.0)  # Use 0.0 as default if 'best_mAP' is not in the checkpoint
+    return model, optimizer, epoch, best_mAP
 
 def setup_environment(args):
     if args.colab:
@@ -452,6 +452,7 @@ def parse_arguments():
     parser.add_argument('--no_preload', action='store_true', help='Preload images into memory')
     parser.add_argument('--freeze_layers', type=str, default='', help='Layers to freeze (comma-separated, e.g., "layer1,layer2")')
     parser.add_argument('--all_images', action='store_true', help='use all images in dataloaders (including NaN entries)')
+    parser.add_argument('--resume', type=str, default='', help='Path to checkpoint to resume from')
     return parser.parse_args()
 
 def main():
@@ -514,16 +515,16 @@ def main():
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.05)
 
-    # Load checkpoint if it exists
-    checkpoint_path = '/content/drive/MyDrive/MM/CatKidney/exps/model_epoch40/best_model/hob_knob.pt'
-    if os.path.exists(checkpoint_path):
-        print(f"Loading checkpoint from {checkpoint_path}")
-        model, optimizer, start_epoch, best_mAP = load_checkpoint(checkpoint_path, model, optimizer)
-        print(f"Resuming training from epoch {start_epoch} with mAP {best_mAP}")
-    else:
-        start_epoch = 0
-        best_mAP = 0.0
-        print("No checkpoint found, starting training from scratch.")
+    # Load checkpoint if specified
+    start_epoch = 0
+    best_mAP = 0.0
+    if args.resume:
+        if os.path.isfile(args.resume):
+            print(f"Loading checkpoint from {args.resume}")
+            model, optimizer, start_epoch, best_mAP = load_checkpoint(args.resume, model, optimizer)
+            print(f"Resuming training from epoch {start_epoch} with best mAP {best_mAP}")
+        else:
+            print(f"No checkpoint found at {args.resume}")
 
     # learning rate scheduler
     lr_scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs - start_epoch, eta_min=min_lr)
@@ -568,14 +569,6 @@ def main():
             if mAP == 0.0:
                 print("Warning: Model failed to detect any objects. Consider adjusting model parameters or checking the dataset.")
 
-            # if use_wandb:
-            #     # Log metrics
-            #     wandb.log({
-            #         "epoch": epoch + 1,
-            #         "avg_loss": avg_loss,
-            #         "learning_rate": current_lr,
-            #         "mAP": mAP
-            #     })
             if use_wandb:
                 wandb.log({
                     "epoch": epoch + 1,
@@ -596,7 +589,7 @@ def main():
                     'epoch': epoch + 1,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
-                    'mAP': mAP,
+                    'best_mAP': best_mAP,
                 }, os.path.join(checkpoint_dir, 'best_model.pth'))
 
                 print(f"New best model saved in: {checkpoint_dir}/best_model.pth")
