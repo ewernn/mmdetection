@@ -104,7 +104,7 @@ def get_transform(train):
         transforms.extend([
             T.RandomHorizontalFlip(p=0.5),  # Add horizontal flip with 50% probability
             T.RandomAffine(
-                degrees=(-30, 30),
+                degrees=(-20, 20),
                 translate=(0.1, 0.1),
                 scale=(0.9, 1.1),
                 fill=0
