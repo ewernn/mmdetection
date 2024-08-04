@@ -476,7 +476,7 @@ def main():
 
     # Hyperparameters
     eval_every_n_epochs = 2
-    num_classes = 3  # Background (0), c2_vertebrae (1)
+    num_classes = 2  # Background (0), c2_vertebrae (1)
     num_epochs = 40
     batch_size = args.batch_size
     learning_rate = args.learning_rate
