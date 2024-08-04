@@ -391,9 +391,11 @@ def create_model(args, num_classes):
         (550, 525),   # Medium-large objects
         (700, 600),   # Large objects
     )
-    aspect_ratios = (
-        (0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.65, 2.05, 2.6, 3.4),
-    ) * len(anchor_sizes)
+    # aspect_ratios = (
+    #     (0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.65, 2.05, 2.6, 3.4),
+    # ) * len(anchor_sizes)
+    aspect_ratios = ast.literal_eval(args.aspect_ratios) * len(anchor_sizes)
+
     
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
 
@@ -467,6 +469,7 @@ def parse_arguments():
     parser.add_argument('--roi_heads_nms_thresh', type=float, default=0.3, help='ROI heads NMS threshold')
     parser.add_argument('--roi_heads_detections_per_img', type=int, default=1, help='Number of detections per image')
     parser.add_argument('--roi_heads_positive_fraction', type=float, default=0.25, help='Fraction of positive ROIs')
+    parser.add_argument('--aspect_ratios', type=str, default="((0.5, 1.0, 2.0),)", help='Aspect ratios for anchor generator')
     return parser.parse_args()
 
 def main():
