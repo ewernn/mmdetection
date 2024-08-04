@@ -415,18 +415,18 @@ def modify_model(model, num_classes):
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
     # Modify other RPN and ROI parameters
-    model.rpn.nms_thresh = 0.8  # increase from 0.5 to allow less overlap
-    model.rpn.fg_iou_thresh = 0.75  # changed from .8
-    model.rpn.bg_iou_thresh = 0.3  # changed from .3
-    model.roi_heads.batch_size_per_image = 256  # Keep as is
-    model.roi_heads.positive_fraction = 0.5  # Keep as is
-    model.roi_heads.score_thresh = 0.3  # Lowered from 0.5 to allow lower confidence detections
-    model.roi_heads.nms_thresh = 0.3  # tighten from 0.3 to allow less overlap
-    model.roi_heads.detections_per_img = 6  # Increase from 2 to 10
+    model.rpn.nms_thresh = wandb.config.rpn_nms_thresh
+    model.rpn.fg_iou_thresh = 0.7
+    model.rpn.bg_iou_thresh = 0.3
+    model.roi_heads.batch_size_per_image = 32
+    model.roi_heads.positive_fraction = wandb.config.roi_heads_positive_fraction
+    model.roi_heads.score_thresh = 0.05
+    model.roi_heads.nms_thresh = wandb.config.roi_heads_nms_thresh
+    model.roi_heads.detections_per_img = wandb.config.roi_heads_detections_per_img
 
     # Set pre_nms_top_n and post_nms_top_n
-    model.rpn.pre_nms_top_n = lambda: 200  # Decreased from 3000
-    model.rpn.post_nms_top_n = lambda: 40  # Decreased from 1500
+    model.rpn.pre_nms_top_n = lambda: 100
+    model.rpn.post_nms_top_n = lambda: 50
     return model
 
 def load_checkpoint(filepath, model, optimizer):
@@ -463,6 +463,10 @@ def parse_arguments():
     parser.add_argument('--freeze_layers', type=str, default='', help='Layers to freeze (comma-separated, e.g., "layer1,layer2")')
     parser.add_argument('--all_images', action='store_true', help='use all images in dataloaders (including NaN entries)')
     parser.add_argument('--resume', type=str, default='', help='Path to checkpoint to resume from')
+    parser.add_argument('--rpn_nms_thresh', type=float, default=0.7, help='RPN NMS threshold')
+    parser.add_argument('--roi_heads_nms_thresh', type=float, default=0.3, help='ROI heads NMS threshold')
+    parser.add_argument('--roi_heads_detections_per_img', type=int, default=1, help='Number of detections per image')
+    parser.add_argument('--roi_heads_positive_fraction', type=float, default=0.25, help='Fraction of positive ROIs')
     return parser.parse_args()
 
 def main():
@@ -614,3 +618,44 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# 1: mAP .58
+# def modify_model(model, num_classes):
+#     in_features = model.roi_heads.box_predictor.cls_score.in_features
+#     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+
+#     # Modify other RPN and ROI parameters
+#     model.rpn.nms_thresh = 0.7  # increase from 0.5 to allow less overlap
+#     model.rpn.fg_iou_thresh = 0.7  # changed from .8
+#     model.rpn.bg_iou_thresh = 0.3  # changed from .3
+#     model.roi_heads.batch_size_per_image = 32  # Keep as is
+#     model.roi_heads.positive_fraction = 0.25  # Keep as is
+#     model.roi_heads.score_thresh = 0.05  # Lowered from 0.5 to allow lower confidence detections
+#     model.roi_heads.nms_thresh = 0.2  # tighten from 0.3 to increase precision (allow less overlap)
+#     model.roi_heads.detections_per_img = 1  # Increase from 2 to 10
+
+#     # Set pre_nms_top_n and post_nms_top_n
+#     model.rpn.pre_nms_top_n = lambda: 100  # Decreased from 3000
+#     model.rpn.post_nms_top_n = lambda: 50  # Decreased from 1500
+#     return model
+
+# 2: mAP .4
+# def modify_model(model, num_classes):
+#     in_features = model.roi_heads.box_predictor.cls_score.in_features
+#     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+
+#     # Modify other RPN and ROI parameters
+#     model.rpn.nms_thresh = 0.7  # increase from 0.5 to allow less overlap
+#     model.rpn.fg_iou_thresh = 0.7  # changed from .8
+#     model.rpn.bg_iou_thresh = 0.3  # changed from .3
+#     model.roi_heads.batch_size_per_image = 32  # Keep as is
+#     model.roi_heads.positive_fraction = 0.25  # Keep as is
+#     model.roi_heads.score_thresh = 0.05  # Lowered from 0.5 to allow lower confidence detections
+#     model.roi_heads.nms_thresh = 0.2  # tighten from 0.3 to increase precision (allow less overlap)
+#     model.roi_heads.detections_per_img = 1  # Increase from 2 to 10
+
+#     # Set pre_nms_top_n and post_nms_top_n
+#     model.rpn.pre_nms_top_n = lambda: 100  # Decreased from 3000
+#     model.rpn.post_nms_top_n = lambda: 50  # Decreased from 1500
+#     return model

@@ -9,14 +9,13 @@ command:
   - "--backbone"
   - "resnet152"
   - "--wandb"
-  - "--freeze_layers=layer1"
   - ${args}
   #- "--freeze_layers=${freeze_layers}"
 parameters:
   learning_rate:
     values: [1e-4]
-  freeze_layers:
-    values: ["", "layer1", "layer1,layer2"]
+  # freeze_layers:
+  #   values: ["", "layer1", "layer1,layer2"]
   # anchor_sizes:
   #   values:
   #     - "((161,), (192,), (219,), (252,), (311,))"
@@ -29,3 +28,15 @@ parameters:
   #   values: ["resnet101", "resnet152"]
   batch_size:
     values: [4]
+  learning_rate:
+    values: [1e-4]
+  batch_size:
+    values: [4]
+  rpn_nms_thresh:
+    values: [0.7, 0.9]
+  roi_heads_nms_thresh:
+    values: [0.3, 0.4]
+  roi_heads_detections_per_img:
+    values: [1, 10]
+  roi_heads_positive_fraction:
+    values: [0.3, 0.7]
