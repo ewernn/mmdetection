@@ -418,17 +418,27 @@ def create_model(args, num_classes):
     # AnchorGenerator
     # anchor_sizes = ((317, 428), (432, 528), (506, 536), (579, 544), (687, 543))
     # aspect_ratios = ((0.5, 0.9, 1.0, 1.2, 1.4, 1.8),) * 5
+    # anchor_sizes = (
+    #     (200, 300),   # Small objects
+    #     (300, 375),   # Medium-small objects
+    #     (415, 450),   # Medium objects
+    #     (515, 650),   # Medium-large objects
+    #     (700, 900),   # Large objects
+    # )
     anchor_sizes = (
-        (200, 300),   # Small objects
-        (300, 375),   # Medium-small objects
-        (415, 450),   # Medium objects
-        (515, 650),   # Medium-large objects
-        (700, 900),   # Large objects
+        (200, 200),   # Small objects
+        (315, 315),   # Medium-small objects
+        (450, 450),   # Medium objects
+        (575, 575),   # Medium-large objects
+        (700, 700),   # Large objects
     )
     # aspect_ratios = (
     #     (0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.65, 2.05, 2.6, 3.4),
     # ) * len(anchor_sizes)
-    aspect_ratios = ast.literal_eval(args.aspect_ratios) * len(anchor_sizes)
+    aspect_ratios = (
+        (0.7, 0.9, 1.0, 1.15, 1.4, 1.8, 2.3),
+    ) * len(anchor_sizes)
+    #aspect_ratios = ast.literal_eval(args.aspect_ratios) * len(anchor_sizes)
 
     
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
