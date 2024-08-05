@@ -33,14 +33,14 @@ parameters:
   batch_size:
     values: [4]
   rpn_nms_thresh:
-    values: [0.7, 0.9]
+    values: [0.7] #[0.7, 0.9]
   roi_heads_nms_thresh:
     values: [0.3]
     #values: [0.3, 0.4]
   roi_heads_detections_per_img:
-    values: [1, 10]
+    values: [10] #[1, 10]
   roi_heads_positive_fraction:
-    values: [0.3, 0.7]
+    values: [0.6] #[0.3, 0.7]
   aspect_ratios:
     values:
       - "((0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.65, 2.05, 2.6, 3.4),)"
