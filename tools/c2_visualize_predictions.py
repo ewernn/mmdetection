@@ -82,7 +82,7 @@ def visualize_and_save(image, gt_boxes, pred_boxes, pred_scores, image_id, save_
     plt.close(fig)
 
 def main(model_path, coco_path, img_dir, save_dir, device):
-    num_classes = 3
+    num_classes = 2
     model = load_model(model_path, device, num_classes)
     coco, img_ids = get_dataset(coco_path, img_dir)
 

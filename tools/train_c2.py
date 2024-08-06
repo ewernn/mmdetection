@@ -89,13 +89,13 @@ class CocoDataset(Dataset):
         return len(self.ids)
 
 def adjust_brightness(img):
-    return TF.adjust_brightness(img, brightness_factor=random.uniform(0.6, 1.4))
+    return TF.adjust_brightness(img, brightness_factor=random.uniform(0.5, 1.4))
 
 def expand_channels(img):
     return img.repeat(3, 1, 1) if img.shape[0] == 1 else img
 
 def adjust_contrast(img):
-    return TF.adjust_contrast(img, contrast_factor=random.uniform(0.3, 1.7))
+    return TF.adjust_contrast(img, contrast_factor=random.uniform(0.3, 1.5))
 
 def get_transform(train):
     transforms = []
@@ -112,8 +112,8 @@ def get_transform(train):
             T.Lambda(adjust_brightness),
             T.RandomAutocontrast(p=0.5),
             T.Lambda(adjust_contrast),
-            T.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
-            T.RandomAdjustSharpness(sharpness_factor=2, p=0.5),
+            T.GaussianBlur(kernel_size=3, sigma=(0.1, 1.5)),
+            #T.RandomAdjustSharpness(sharpness_factor=2, p=0.5),
         ])
     # Expand grayscale to 3 channels
     transforms.append(T.Lambda(expand_channels))
@@ -389,7 +389,7 @@ def create_model(args, num_classes):
         (300, 375),   # Medium-small objects
         (415, 450),   # Medium objects
         (550, 525),   # Medium-large objects
-        (700, 600),   # Large objects
+        (750, 615),   # Large objects
     )
     # aspect_ratios = (
     #     (0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.65, 2.05, 2.6, 3.4),
@@ -403,7 +403,7 @@ def create_model(args, num_classes):
 
     # Set the trainable layers based on args.freeze_layers
     for name, parameter in model.backbone.body.named_parameters():
-        if 'layer1' in name and 'freeze_layer1' in args.freeze_layers:
+        if 'layer1' in name: # and 'freeze_layer1' in args.freeze_layers:
             parameter.requires_grad = False
         elif 'layer2' in name and 'freeze_layer2' in args.freeze_layers:
             parameter.requires_grad = False
@@ -427,8 +427,8 @@ def modify_model(model, num_classes):
     model.roi_heads.detections_per_img = wandb.config.roi_heads_detections_per_img
 
     # Set pre_nms_top_n and post_nms_top_n
-    model.rpn.pre_nms_top_n = lambda: 100
-    model.rpn.post_nms_top_n = lambda: 50
+    model.rpn.pre_nms_top_n = lambda: 300
+    model.rpn.post_nms_top_n = lambda: 100
     return model
 
 def load_checkpoint(filepath, model, optimizer):
@@ -469,7 +469,8 @@ def parse_arguments():
     parser.add_argument('--roi_heads_nms_thresh', type=float, default=0.3, help='ROI heads NMS threshold')
     parser.add_argument('--roi_heads_detections_per_img', type=int, default=10, help='Number of detections per image')
     parser.add_argument('--roi_heads_positive_fraction', type=float, default=0.3, help='Fraction of positive ROIs')
-    parser.add_argument('--aspect_ratios', type=str, default="((0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.65, 2.05, 2.6, 3.4),)", help='Aspect ratios for anchor generator')
+    #parser.add_argument('--aspect_ratios', type=str, default="((0.5, 0.9, 1.0, 1.2, 1.4, 1.8, 2.5),)", help='Aspect ratios for anchor generator')
+    parser.add_argument('--aspect_ratios', type=str, default="((0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.75, 2.4, 3.3),)", help='Aspect ratios for anchor generator')
     return parser.parse_args()
 
 def main():
@@ -530,7 +531,7 @@ def main():
 
     print("Creating optimizer and scheduler...")
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.05)
+    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.005)
 
     # Load checkpoint if specified
     start_epoch = 0
