@@ -335,6 +335,16 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, lo
             optimizer.zero_grad()
             losses.backward()
             parameters = list(model.parameters())
+            # total_norm_before = manual_gradient_clipping(parameters, float('inf'))
+            # total_norm = manual_gradient_clipping(parameters, max_grad_norm)
+            # Calculate and log gradient norms before clipping
+            #total_norm_before = manual_gradient_clipping(model.parameters(), float('inf'))
+            # print(f"Total norm before clipping: {total_norm_before:.4f}")
+            # Apply gradient clipping
+            # print(f"max_grad_norm: {max_grad_norm}")
+            # print(f"model.parameters(): {model.parameters()}")
+            #total_norm = manual_gradient_clipping(model.parameters(), max_grad_norm)
+            # print(f"Total norm after clipping: {total_norm:.4f}")
             optimizer.step()
 
         optimizer.zero_grad()  # Ensure gradients are zeroed after each batch
@@ -356,50 +366,6 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, lo
     print(f"Epoch {epoch} complete. Average Loss: {avg_loss:.4f}")
 
     return avg_loss
-# def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, localization_weight=2.0, max_grad_norm=1.0):
-#     model.train()
-#     total_loss = 0
-#     num_batches = 0
-#     start_time = time.time()
-#     accumulation_steps = 2  # Accumulate gradients over 2 batches of 4 images each
-
-#     optimizer.zero_grad()  # Zero gradients at the beginning of each epoch
-
-#     for batch_idx, (images, targets) in enumerate(data_loader):
-#         images = list(image.to(device) for image in images)
-#         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
-#         loss_dict = model(images, targets)
-#         loss_dict['loss_box_reg'] *= localization_weight
-#         loss_dict['loss_rpn_box_reg'] *= localization_weight
-#         losses = sum(loss for loss in loss_dict.values())
-#         loss = losses / accumulation_steps  # Normalize the loss
-
-#         loss.backward()
-
-#         total_loss += losses.item()  # Use the un-normalized loss for logging
-#         num_batches += 1
-
-#         if (batch_idx + 1) % accumulation_steps == 0:
-#             # Clip gradients
-#             if max_grad_norm > 0:
-#                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
-            
-#             optimizer.step()
-#             optimizer.zero_grad()
-
-#         if batch_idx % print_freq == 0:
-#             avg_loss = total_loss / num_batches
-#             elapsed_time = time.time() - start_time
-#             images_per_sec = (batch_idx + 1) * len(images) / elapsed_time
-#             print(f"Epoch [{epoch}][{batch_idx}/{len(data_loader)}] "
-#                   f"Loss: {avg_loss:.4f} "
-#                   f"Images/sec: {images_per_sec:.1f}")
-
-#     avg_loss = total_loss / num_batches
-#     print(f"Epoch {epoch} complete. Average Loss: {avg_loss:.4f}")
-
-#     return avg_loss
 
 
 def parse_tuple(argument):
@@ -418,27 +384,17 @@ def create_model(args, num_classes):
     # AnchorGenerator
     # anchor_sizes = ((317, 428), (432, 528), (506, 536), (579, 544), (687, 543))
     # aspect_ratios = ((0.5, 0.9, 1.0, 1.2, 1.4, 1.8),) * 5
-    # anchor_sizes = (
-    #     (200, 300),   # Small objects
-    #     (300, 375),   # Medium-small objects
-    #     (415, 450),   # Medium objects
-    #     (515, 650),   # Medium-large objects
-    #     (700, 900),   # Large objects
-    # )
     anchor_sizes = (
-        (200, 200),   # Small objects
-        (315, 315),   # Medium-small objects
-        (450, 450),   # Medium objects
-        (575, 575),   # Medium-large objects
-        (700, 700),   # Large objects
+        (200, 300),   # Small objects
+        (300, 375),   # Medium-small objects
+        (415, 450),   # Medium objects
+        (550, 525),   # Medium-large objects
+        (700, 600),   # Large objects
     )
     # aspect_ratios = (
     #     (0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.65, 2.05, 2.6, 3.4),
     # ) * len(anchor_sizes)
-    aspect_ratios = (
-        (0.7, 0.9, 1.0, 1.15, 1.4, 1.8, 2.3),
-    ) * len(anchor_sizes)
-    #aspect_ratios = ast.literal_eval(args.aspect_ratios) * len(anchor_sizes)
+    aspect_ratios = ast.literal_eval(args.aspect_ratios) * len(anchor_sizes)
 
     
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
@@ -503,7 +459,7 @@ def parse_arguments():
     parser.add_argument('--backbone', type=str, default='resnet152', choices=['resnet50', 'resnet101', 'resnet152'],
                         help='Backbone architecture to use')
     parser.add_argument('--batch_size', type=int, default=4, help='Batch size for training')
-    parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate for training')
+    parser.add_argument('--learning_rate', type=float, default=0.0001, help='Learning rate for training')
     parser.add_argument('--no_sweep', action='store_true', help='Disable wandb sweep and use specified hyperparameters')
     parser.add_argument('--no_preload', action='store_true', help='Preload images into memory')
     parser.add_argument('--freeze_layers', type=str, default='', help='Layers to freeze (comma-separated, e.g., "layer1,layer2")')
@@ -511,9 +467,9 @@ def parse_arguments():
     parser.add_argument('--resume', type=str, default='', help='Path to checkpoint to resume from')
     parser.add_argument('--rpn_nms_thresh', type=float, default=0.7, help='RPN NMS threshold')
     parser.add_argument('--roi_heads_nms_thresh', type=float, default=0.3, help='ROI heads NMS threshold')
-    parser.add_argument('--roi_heads_detections_per_img', type=int, default=1, help='Number of detections per image')
-    parser.add_argument('--roi_heads_positive_fraction', type=float, default=0.25, help='Fraction of positive ROIs')
-    parser.add_argument('--aspect_ratios', type=str, default="((0.5, 1.0, 2.0),)", help='Aspect ratios for anchor generator')
+    parser.add_argument('--roi_heads_detections_per_img', type=int, default=10, help='Number of detections per image')
+    parser.add_argument('--roi_heads_positive_fraction', type=float, default=0.3, help='Fraction of positive ROIs')
+    parser.add_argument('--aspect_ratios', type=str, default="((0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.65, 2.05, 2.6, 3.4),)", help='Aspect ratios for anchor generator')
     return parser.parse_args()
 
 def main():
@@ -524,7 +480,7 @@ def main():
     # Hyperparameters
     eval_every_n_epochs = 2
     num_classes = 2  # Background (0), c2_vertebrae (1)
-    num_epochs = 30
+    num_epochs = 120
     batch_size = args.batch_size
     learning_rate = args.learning_rate
     min_lr = args.learning_rate / 100
@@ -665,43 +621,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# 1: mAP .58
-# def modify_model(model, num_classes):
-#     in_features = model.roi_heads.box_predictor.cls_score.in_features
-#     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-
-#     # Modify other RPN and ROI parameters
-#     model.rpn.nms_thresh = 0.7  # increase from 0.5 to allow less overlap
-#     model.rpn.fg_iou_thresh = 0.7  # changed from .8
-#     model.rpn.bg_iou_thresh = 0.3  # changed from .3
-#     model.roi_heads.batch_size_per_image = 32  # Keep as is
-#     model.roi_heads.positive_fraction = 0.25  # Keep as is
-#     model.roi_heads.score_thresh = 0.05  # Lowered from 0.5 to allow lower confidence detections
-#     model.roi_heads.nms_thresh = 0.2  # tighten from 0.3 to increase precision (allow less overlap)
-#     model.roi_heads.detections_per_img = 1  # Increase from 2 to 10
-
-#     # Set pre_nms_top_n and post_nms_top_n
-#     model.rpn.pre_nms_top_n = lambda: 100  # Decreased from 3000
-#     model.rpn.post_nms_top_n = lambda: 50  # Decreased from 1500
-#     return model
-
-# 2: mAP .4
-# def modify_model(model, num_classes):
-#     in_features = model.roi_heads.box_predictor.cls_score.in_features
-#     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-
-#     # Modify other RPN and ROI parameters
-#     model.rpn.nms_thresh = 0.7  # increase from 0.5 to allow less overlap
-#     model.rpn.fg_iou_thresh = 0.7  # changed from .8
-#     model.rpn.bg_iou_thresh = 0.3  # changed from .3
-#     model.roi_heads.batch_size_per_image = 32  # Keep as is
-#     model.roi_heads.positive_fraction = 0.25  # Keep as is
-#     model.roi_heads.score_thresh = 0.05  # Lowered from 0.5 to allow lower confidence detections
-#     model.roi_heads.nms_thresh = 0.2  # tighten from 0.3 to increase precision (allow less overlap)
-#     model.roi_heads.detections_per_img = 1  # Increase from 2 to 10
-
-#     # Set pre_nms_top_n and post_nms_top_n
-#     model.rpn.pre_nms_top_n = lambda: 100  # Decreased from 3000
-#     model.rpn.post_nms_top_n = lambda: 50  # Decreased from 1500
-#     return model
