@@ -89,7 +89,7 @@ class CocoDataset(Dataset):
         return len(self.ids)
 
 def adjust_brightness(img):
-    return TF.adjust_brightness(img, brightness_factor=random.uniform(0.5, 1.4))
+    return TF.adjust_brightness(img, brightness_factor=random.uniform(0.3, 1.5))
 
 def expand_channels(img):
     return img.repeat(3, 1, 1) if img.shape[0] == 1 else img
@@ -110,10 +110,11 @@ def get_transform(train):
                 fill=0
             ),
             T.Lambda(adjust_brightness),
-            T.RandomAutocontrast(p=0.5),
+            #T.RandomAutocontrast(p=0.5),
             T.Lambda(adjust_contrast),
-            T.GaussianBlur(kernel_size=3, sigma=(0.1, 1.5)),
-            #T.RandomAdjustSharpness(sharpness_factor=2, p=0.5),
+            #T.GaussianBlur(kernel_size=3, sigma=(0.1, 2.5)),
+            T.GaussianBlur(kernel_size=random.choice([3, 5, 7]), sigma=(0.1, 2.5)),
+            T.RandomAdjustSharpness(sharpness_factor=2, p=0.5),
         ])
     # Expand grayscale to 3 channels
     transforms.append(T.Lambda(expand_channels))
@@ -481,7 +482,7 @@ def main():
     # Hyperparameters
     eval_every_n_epochs = 2
     num_classes = 2  # Background (0), c2_vertebrae (1)
-    num_epochs = 120
+    num_epochs = 200
     batch_size = args.batch_size
     learning_rate = args.learning_rate
     min_lr = args.learning_rate / 100
@@ -531,7 +532,7 @@ def main():
 
     print("Creating optimizer and scheduler...")
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.0001)
+    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.0003)
 
     # Load checkpoint if specified
     start_epoch = 0
