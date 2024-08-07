@@ -393,7 +393,7 @@ def create_model(args, num_classes):
         (750, 615),   # Large objects
     )
     # aspect_ratios = (
-    #     (0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.65, 2.05, 2.6, 3.4),
+    #     (0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.75, 2.4, 3.3),
     # ) * len(anchor_sizes)
     aspect_ratios = ast.literal_eval(args.aspect_ratios) * len(anchor_sizes)
 
@@ -413,19 +413,19 @@ def create_model(args, num_classes):
 
     return model
 
-def modify_model(model, num_classes):
+def modify_model(model, num_classes, args):
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
     # Modify other RPN and ROI parameters
-    model.rpn.nms_thresh = wandb.config.rpn_nms_thresh
+    model.rpn.nms_thresh = args.rpn_nms_thresh
     model.rpn.fg_iou_thresh = 0.7
     model.rpn.bg_iou_thresh = 0.3
     model.roi_heads.batch_size_per_image = 32
-    model.roi_heads.positive_fraction = wandb.config.roi_heads_positive_fraction
-    model.roi_heads.score_thresh = 0.05
-    model.roi_heads.nms_thresh = wandb.config.roi_heads_nms_thresh
-    model.roi_heads.detections_per_img = wandb.config.roi_heads_detections_per_img
+    model.roi_heads.positive_fraction = args.roi_heads_positive_fraction
+    model.roi_heads.score_thresh = args.score_thresh
+    model.roi_heads.nms_thresh = args.roi_heads_nms_thresh
+    model.roi_heads.detections_per_img = args.roi_heads_detections_per_img
 
     # Set pre_nms_top_n and post_nms_top_n
     model.rpn.pre_nms_top_n = lambda: 300
@@ -471,6 +471,8 @@ def parse_arguments():
     parser.add_argument('--roi_heads_detections_per_img', type=int, default=10, help='Number of detections per image')
     parser.add_argument('--roi_heads_positive_fraction', type=float, default=0.3, help='Fraction of positive ROIs')
     parser.add_argument('--aspect_ratios', type=str, default="((0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.75, 2.4, 3.3),)", help='Aspect ratios for anchor generator')
+    parser.add_argument('--score_thresh', type=float, default=0.1, help='Score threshold for detections')
+    parser.add_argument('--num_epochs', type=int, default=50, help='Number of epochs to train for')
     return parser.parse_args()
 
 def main():
@@ -481,7 +483,7 @@ def main():
     # Hyperparameters
     eval_every_n_epochs = 2
     num_classes = 2  # Background (0), c2_vertebrae (1)
-    num_epochs = 200
+    num_epochs = args.num_epochs
     batch_size = args.batch_size
     learning_rate = args.learning_rate
     min_lr = args.learning_rate / 100
@@ -517,7 +519,7 @@ def main():
     model = create_model(args, num_classes)
 
     print("Modifying model parameters...")
-    model = modify_model(model, num_classes)
+    model = modify_model(model, num_classes, args)
 
     print("Printing trainable status of layers:")
     for name, param in model.named_parameters():
