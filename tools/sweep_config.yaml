@@ -28,9 +28,8 @@ parameters:
   batch_size:
     values: [4]
   learning_rate:
-    values: [1e-4]
-  batch_size:
-    values: [4]
+    values: [7e-5]
+    #values: [1e-4]
   rpn_nms_thresh:
     values: [0.7] #[0.7, 0.9]
   roi_heads_nms_thresh:
