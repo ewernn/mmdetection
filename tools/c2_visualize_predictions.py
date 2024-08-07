@@ -13,9 +13,9 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 def create_model(device, num_classes):
     # Define the backbone and modifications as in train_c2.py
-    backbone = resnet_fpn_backbone('resnet152', pretrained=False)  # Adjust the backbone model as per training configuration
+    backbone = resnet_fpn_backbone(backbone_name='resnet152', weights=None)
     anchor_sizes = ((317, 428), (432, 528), (506, 536), (579, 544), (687, 543))
-    aspect_ratios = ((0.5, 0.9, 1.0, 1.2, 1.4, 1.8),) * 5
+    aspect_ratios = ((0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.75, 2.4, 3.3),) * 5
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
 
     model = FasterRCNN(backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
@@ -26,14 +26,18 @@ def create_model(device, num_classes):
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
     # Apply other modifications as necessary
-    model.rpn.nms_thresh = 0.8
-    model.rpn.fg_iou_thresh = 0.6
+    model.rpn.nms_thresh = 0.7  # Default value, as it's configurable in train_c2.py
+    model.rpn.fg_iou_thresh = 0.7
     model.rpn.bg_iou_thresh = 0.3
-    model.roi_heads.batch_size_per_image = 256
-    model.roi_heads.positive_fraction = 0.5
-    model.roi_heads.score_thresh = 0.85
-    model.roi_heads.nms_thresh = 0.4
-    model.roi_heads.detections_per_img = 4
+    model.roi_heads.batch_size_per_image = 32
+    model.roi_heads.positive_fraction = 0.3  # Default value, as it's configurable in train_c2.py
+    model.roi_heads.score_thresh = 0.05
+    model.roi_heads.nms_thresh = 0.3  # Default value, as it's configurable in train_c2.py
+    model.roi_heads.detections_per_img = 10  # Default value, as it's configurable in train_c2.py
+
+    # Set pre_nms_top_n and post_nms_top_n
+    model.rpn.pre_nms_top_n = lambda: 300
+    model.rpn.post_nms_top_n = lambda: 100
 
     return model
 
