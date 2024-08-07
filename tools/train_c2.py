@@ -470,7 +470,6 @@ def parse_arguments():
     parser.add_argument('--roi_heads_nms_thresh', type=float, default=0.3, help='ROI heads NMS threshold')
     parser.add_argument('--roi_heads_detections_per_img', type=int, default=10, help='Number of detections per image')
     parser.add_argument('--roi_heads_positive_fraction', type=float, default=0.3, help='Fraction of positive ROIs')
-    #parser.add_argument('--aspect_ratios', type=str, default="((0.5, 0.9, 1.0, 1.2, 1.4, 1.8, 2.5),)", help='Aspect ratios for anchor generator')
     parser.add_argument('--aspect_ratios', type=str, default="((0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.75, 2.4, 3.3),)", help='Aspect ratios for anchor generator')
     return parser.parse_args()
 

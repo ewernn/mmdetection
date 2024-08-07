@@ -15,7 +15,7 @@ def create_model(device, num_classes):
     # Define the backbone and modifications as in train_c2.py
     backbone = resnet_fpn_backbone(backbone_name='resnet152', weights=None)
     anchor_sizes = ((317, 428), (432, 528), (506, 536), (579, 544), (687, 543))
-    aspect_ratios = ((0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.75, 2.4, 3.3),) * 5
+    aspect_ratios = ((0.5, 0.7, 0.9, 1.0, 1.15, 1.35, 1.75, 2.4, 3.3),) * len(anchor_sizes)
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
 
     model = FasterRCNN(backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
@@ -113,9 +113,10 @@ def main(model_path, coco_path, img_dir, save_dir, device):
 
 if __name__ == "__main__":
     c2 = '/Users/ewern/Desktop/code/MetronMind/c2/'
-    model_path = '/content/drive/MyDrive/MM/c2/exps/u0iy3e9k/best_model.pth'
+    #model_path = '/content/drive/MyDrive/MM/c2/exps/u0iy3e9k/best_model.pth'
+    model_path = '/content/drive/MyDrive/MM/c2/exps/hdsu9uww/best_model.pth'
     coco_path = '/content/drive/MyDrive/MM/c2/data/Test/all_images_Data_coco_format.json'
     img_dir = '/content/drive/MyDrive/MM/c2/data/Test/'
-    save_dir = '/content/drive/MyDrive/MM/c2/exps/july29_preds_out/'
+    save_dir = '/content/drive/MyDrive/MM/c2/exps/aug7_preds_out/'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     main(model_path, coco_path, img_dir, save_dir, device)
