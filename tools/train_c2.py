@@ -486,7 +486,7 @@ def main():
     num_epochs = args.num_epochs
     batch_size = args.batch_size
     learning_rate = args.learning_rate
-    min_lr = args.learning_rate / 100
+    min_lr = args.learning_rate / 10
     data_root, checkpoint_dir, device = setup_environment(args)
     # data_root = '.../c2/data/'
 
@@ -533,7 +533,7 @@ def main():
 
     print("Creating optimizer and scheduler...")
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.0003)
+    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.0001)
 
     # Load checkpoint if specified
     start_epoch = 0
