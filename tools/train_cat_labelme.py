@@ -235,14 +235,14 @@ class CustomToTensor:
         image = TF.to_tensor(image)
         return image, target
 
-def get_transform(train, args):
+def get_transform(train):
     transforms = []
     transforms.append(CustomToTensor())
     if train:
         transforms.extend([
             RandomAffine(degrees=(-5, 5), translate=(0.1, 0.1), scale=(0.9, 1.1), fill=0),
-            AdjustBrightness(args.brightness_range),
-            AdjustContrast(args.contrast_range),
+            AdjustBrightness((0.2, 1.8)),
+            AdjustContrast((0.2, 1.8)),
             GaussianBlur(kernel_size=random.choice([3, 5, 7]), sigma=(0.1, 2.5)),
             RandomAdjustSharpness(sharpness_factor=2, p=0.5),
         ])
@@ -592,8 +592,8 @@ def main():
         train_ann_file = data_root + 'Train/only_with_bbox_Data_coco_format.json'
         val_ann_file = data_root + 'Test/only_with_bbox_Data_coco_format.json'
     preload = not args.no_preload
-    train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True, args=args), preload=preload, only_10=only_10)#, subfolder='Train')
-    val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False, args=args), preload=preload, only_10=only_10)#, subfolder='Test')
+    train_dataset = CocoDataset(data_root, train_ann_file, transforms=get_transform(train=True), preload=preload, only_10=only_10)#, subfolder='Train')
+    val_dataset = CocoDataset(data_root, val_ann_file, transforms=get_transform(train=False), preload=preload, only_10=only_10)#, subfolder='Test')
 
     print("Creating data loaders...")
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, collate_fn=collate_fn)
