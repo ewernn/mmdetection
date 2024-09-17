@@ -1,0 +1,27 @@
+program: tools/train_c2.py
+method: grid
+name: c2_sweep
+command:
+  - ${env}
+  - python
+  - ${program}
+  - "--colab"
+  - "--backbone"
+  - "resnet152"
+  - "--wandb"
+  - "--batch_size"
+  - "8"
+  - "--num_epochs"
+  - "15"
+  - ${args}
+parameters:
+  roi_heads_score_thresh:
+    values: [0.6, 0.9]
+  rpn_fg_iou_thresh:
+    values: [0.7, 0.8]
+  rpn_bg_iou_thresh:
+    values: [0.3, 0.5]
+  roi_heads_nms_thresh:
+    values: [0.3, 0.6]
+  learning_rate:
+    values: [0.0001, 0.0004]
