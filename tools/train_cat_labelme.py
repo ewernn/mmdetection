@@ -459,7 +459,7 @@ def create_model(args, num_classes):
         (178, 178),  # Large objects
         (225, 225),  # Very large objects
     )
-    aspect_ratios = ((0.71, 0.75, 0.79, 0.84, 1.0),) * len(anchor_sizes)
+    aspect_ratios = ((0.69, 0.74, 0.79, 0.84, 1.0),) * len(anchor_sizes)
 
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
 
@@ -550,8 +550,8 @@ def parse_arguments():
     parser.add_argument('--aspect_ratios', type=str, default="((0.7, 0.9, 1.0, 1.1, 1.25, 1.5, 1.9, 2.4),)", help='Aspect ratios for anchor generator')
     parser.add_argument('--score_thresh', type=float, default=0.7, help='Score threshold for detections')
     parser.add_argument('--num_epochs', type=int, default=100, help='Number of epochs to train for')
-    parser.add_argument('--brightness_range', type=parse_tuple, default=(0.2, 1.8), help='Brightness adjustment range')
-    parser.add_argument('--contrast_range', type=parse_tuple, default=(0.2, 1.8), help='Contrast adjustment range')
+    parser.add_argument('--brightness_range', type=parse_tuple, default=(0.5, 1.5), help='Brightness adjustment range')
+    parser.add_argument('--contrast_range', type=parse_tuple, default=(0.5, 1.5), help='Contrast adjustment range')
     parser.add_argument('--use_tta', action='store_true', help='Use Test Time Augmentation during evaluation')
     parser.add_argument('--tta_contrasts', nargs='+', type=float, default=[0.5, 1.0, 1.5], help='Contrast factors for TTA (space-separated list of floats)')
     parser.add_argument('--tta_brightness', nargs='+', type=float, default=[0.5, 1.0, 1.5], help='Brightness factors for TTA (space-separated list of floats)')
