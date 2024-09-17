@@ -241,8 +241,8 @@ def get_transform(train):
     if train:
         transforms.extend([
             RandomAffine(degrees=(-5, 5), translate=(0.1, 0.1), scale=(0.9, 1.1), fill=0),
-            AdjustBrightness((0.2, 1.8)),
-            AdjustContrast((0.2, 1.8)),
+            AdjustBrightness((0.5, 1.5)),
+            AdjustContrast((0.5, 1.5)),
             GaussianBlur(kernel_size=random.choice([3, 5, 7]), sigma=(0.1, 2.5)),
             RandomAdjustSharpness(sharpness_factor=2, p=0.5),
         ])
