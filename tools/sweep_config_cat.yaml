@@ -6,6 +6,7 @@ command:
   - python
   - ${program}
   - "--colab"
+  - "--all_images"
   - "--backbone"
   - "resnet152"
   - "--wandb"
@@ -16,6 +17,9 @@ command:
   - "--learning_rate"
   - ".0002"
   - ${args}
+metric:
+  name: mAP
+  goal: maximize
 parameters:
   # roi_heads_score_thresh:
   #   values: [0.6] # [0.6, 0.9]
