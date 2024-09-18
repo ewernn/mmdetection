@@ -450,8 +450,15 @@ def create_model(args, num_classes):
     if args.backbone == 'resnet101': weights = ResNet101_Weights.DEFAULT
     if args.backbone == 'resnet152': weights = ResNet152_Weights.DEFAULT
 
-    backbone = resnet_fpn_backbone(backbone_name=args.backbone, weights=weights, trainable_layers=3)
+    backbone = resnet_fpn_backbone(backbone_name=args.backbone, weights=weights, trainable_layers=0)  # =3 is fully unfrozen; Start with all layers frozen
 
+    # anchor_sizes = (
+    #     (87,87),    # Very small objects
+    #     (120,120),  # Small objects
+    #     (170, 170),  # Medium objects
+    #     (225, 225),  # Very large objects
+    # )
+    #aspect_ratios = ((0.66, 0.76, 0.87, 1.0),) * len(anchor_sizes)
     anchor_sizes = (
         (89, 89),    # Very small objects
         (112, 112),  # Small objects
@@ -534,28 +541,38 @@ def parse_arguments():
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='Learning rate for training')
     parser.add_argument('--no_sweep', action='store_true', help='Disable wandb sweep and use specified hyperparameters')
     parser.add_argument('--no_preload', action='store_true', help='Preload images into memory')
-    parser.add_argument('--freeze_layers', type=str, default='', help='Layers to freeze (comma-separated, e.g., "layer1,layer2")')
     parser.add_argument('--all_images', action='store_true', help='use all images in dataloaders (including NaN entries)')
     parser.add_argument('--resume', type=str, default='', help='Path to checkpoint to resume from')
     parser.add_argument('--rpn_nms_thresh', type=float, default=0.3, help='RPN NMS threshold')
     parser.add_argument('--roi_heads_nms_thresh', type=float, default=0.1, help='ROI heads NMS threshold')
-    parser.add_argument('--roi_heads_score_thresh', type=float, default=0.4, help='ROI heads score threshold')
-    parser.add_argument('--rpn_bg_iou_thresh', type=float, default=0.5, help='RPN background IoU threshold')
-    parser.add_argument('--rpn_fg_iou_thresh', type=float, default=0.8, help='RPN foreground IoU threshold')
+    parser.add_argument('--roi_heads_score_thresh', type=float, default=0.45, help='ROI heads score threshold')
+    parser.add_argument('--rpn_bg_iou_thresh', type=float, default=0.3, help='RPN background IoU threshold')
+    parser.add_argument('--rpn_fg_iou_thresh', type=float, default=0.9, help='RPN foreground IoU threshold')
     parser.add_argument('--roi_heads_batch_size_per_image', type=int, default=32, help='ROI heads batch size per image')
     parser.add_argument('--roi_heads_positive_fraction', type=float, default=0.3, help='Fraction of positive ROIs')
     parser.add_argument('--roi_heads_detections_per_img', type=int, default=4, help='Number of detections per image')
     parser.add_argument('--rpn_pre_nms_top_n', type=int, default=200, help='RPN pre-NMS top N')
     parser.add_argument('--rpn_post_nms_top_n', type=int, default=50, help='RPN post-NMS top N')
-    parser.add_argument('--aspect_ratios', type=str, default="((0.7, 0.9, 1.0, 1.1, 1.25, 1.5, 1.9, 2.4),)", help='Aspect ratios for anchor generator')
-    parser.add_argument('--score_thresh', type=float, default=0.7, help='Score threshold for detections')
-    parser.add_argument('--num_epochs', type=int, default=100, help='Number of epochs to train for')
+    parser.add_argument('--score_thresh', type=float, default=0.68, help='Score threshold for detections')
+    parser.add_argument('--num_epochs', type=int, default=101, help='Number of epochs to train for')
     parser.add_argument('--brightness_range', type=parse_tuple, default=(0.5, 1.5), help='Brightness adjustment range')
     parser.add_argument('--contrast_range', type=parse_tuple, default=(0.5, 1.5), help='Contrast adjustment range')
     parser.add_argument('--use_tta', action='store_true', help='Use Test Time Augmentation during evaluation')
     parser.add_argument('--tta_contrasts', nargs='+', type=float, default=[0.5, 1.0, 1.5], help='Contrast factors for TTA (space-separated list of floats)')
     parser.add_argument('--tta_brightness', nargs='+', type=float, default=[0.5, 1.0, 1.5], help='Brightness factors for TTA (space-separated list of floats)')
+    parser.add_argument('--gradual_unfreeze', action='store_true', help='Use gradual unfreezing strategy')
     return parser.parse_args()
+
+def unfreeze_layers(model, num_layers):
+    for name, param in model.backbone.body.named_parameters():
+        param.requires_grad = False
+    
+    layers_to_unfreeze = list(model.backbone.body.named_children())[-num_layers:]
+    for layer in layers_to_unfreeze:
+        for param in layer[1].parameters():
+            param.requires_grad = True
+
+    return model
 
 def main():
     global use_wandb, use_colab
@@ -643,7 +660,27 @@ def main():
 
     print(f"Validation dataset size: {len(val_dataset)}")
 
+    if args.gradual_unfreeze:
+        unfreeze_schedule = {
+            10: 1,
+            20: 2,
+            30: 3,
+            40: 4,
+        }
+    else:
+        unfreeze_schedule = {}
+
     for epoch in range(start_epoch, num_epochs):
+        if args.gradual_unfreeze and epoch in unfreeze_schedule:
+            model = unfreeze_layers(model, unfreeze_schedule[epoch])
+            # Recreate optimizer with different learning rates
+            params = [
+                {'params': [p for n, p in model.named_parameters() if 'backbone' not in n], 'lr': learning_rate},
+                {'params': [p for n, p in model.named_parameters() if 'backbone' in n], 'lr': learning_rate * 0.1},
+            ]
+            optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=0.0001)
+            lr_scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs - epoch, eta_min=min_lr)
+
         if epoch < start_epoch + 5:
             lr = learning_rate * ((epoch - start_epoch + 1) / 5)
             for param_group in optimizer.param_groups:
