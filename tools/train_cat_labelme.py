@@ -561,6 +561,7 @@ def parse_arguments():
     parser.add_argument('--tta_contrasts', nargs='+', type=float, default=[0.5, 1.0, 1.5], help='Contrast factors for TTA (space-separated list of floats)')
     parser.add_argument('--tta_brightness', nargs='+', type=float, default=[0.5, 1.0, 1.5], help='Brightness factors for TTA (space-separated list of floats)')
     parser.add_argument('--gradual_unfreeze', action='store_true', help='Use gradual unfreezing strategy')
+    parser.add_argument('--lr_decrease_ratio', type=float, default=100, help='Ratio for learning rate decrease (e.g., 50 to 1000)')
     return parser.parse_args()
 
 def unfreeze_layers(model, num_layers):
@@ -584,7 +585,7 @@ def main():
     num_epochs = args.num_epochs
     batch_size = args.batch_size
     learning_rate = args.learning_rate
-    min_lr = args.learning_rate / 100
+    min_lr = args.learning_rate / args.lr_decrease_ratio
     data_root, checkpoint_dir, device = setup_environment(args)
 
     use_wandb = args.wandb
