@@ -38,6 +38,10 @@ def draw_dashed_line(img, start, end, color, thickness=1, dash_length=5):
 def adjust_bboxes(csv_path, images_dir, start_index=0):
     print(f"Reading CSV file: {csv_path}")
     df = pd.read_csv(csv_path)
+    
+    # Remove leading spaces from column names
+    df.columns = df.columns.str.strip()
+    
     print(f"CSV file read. Shape: {df.shape}")
     print(f"Columns: {df.columns}")
     
@@ -81,7 +85,16 @@ def adjust_bboxes(csv_path, images_dir, start_index=0):
     idx = start_index - 1  # Start one before, as we increment at the beginning of the loop
     while idx < total_images - 1:
         idx += 1
+        
+        # Reload the DataFrame to ensure we have the latest data
+        df = pd.read_csv(csv_path)
+        both_kidneys = df.dropna(subset=['x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'x4', 'y4'])
+        
         row = both_kidneys.iloc[idx]
+        
+        # Print progress every 100 images
+        if idx % 100 == 0:
+            print(f"Progress: {idx}/{total_images} images processed")
         
         image_path = os.path.join(images_dir, row['Image'])
         img = cv2.imread(image_path)
@@ -174,13 +187,13 @@ def adjust_bboxes(csv_path, images_dir, start_index=0):
     return df, idx
 
 # Usage
-csv_path = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Data_only2-sep14.csv'
-images_dir = '/Users/ewern/Desktop/code/MetronMind/data/cat-dataset'
+csv_path = '/Users/ewern/Downloads/DataCatSep26/Data_only2.csv'
+images_dir = '/Users/ewern/Downloads/DataCatSep26'
 
 while True:
     start_index = 0  # Always start from the beginning
     updated_df, last_index = adjust_bboxes(csv_path, images_dir, start_index)
-    updated_df.to_csv('/Users/ewern/Desktop/code/MetronMind/data/cat-dataset/Updated_Data_only2-sep14.csv', index=False)
+    updated_df.to_csv('/Users/ewern/Downloads/DataCatSep26/Data_only2_fixedSep26.csv', index=False)
     
     print(f"Last processed image index: {last_index}")
     print("Program finished. You can run it again to start from the beginning.")
